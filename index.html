@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>物理系统 - 移动版</title>
+    <title>2D文字物理系统</title>
     <script src="matter.min.js"></script>
+    <!-- 腾讯云语音识别 - 直接使用API调用，不需要SDK -->
     <script>
         // 解构 Matter.js 模块
         const { Engine, Render, World, Bodies, Body, Composite, Composites, Constraint, Mouse, MouseConstraint, Events } = Matter;
@@ -91,7 +92,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            color: white;
+            color: rgb(158, 157, 157);
             box-shadow: 0 0 2rem rgba(139, 92, 246, 0.5);
             animation: vortex-pulse 3s infinite;
             z-index: 10;
@@ -377,11 +378,16 @@
                 angleRange: 25 // 优化发射角度范围
             },
             colors: [
-                { bg: 'rgba(59, 130, 246, 0.95)', text: 'white', border: 'rgba(59, 130, 246, 1)' },
-                { bg: 'rgba(16, 185, 129, 0.95)', text: 'white', border: 'rgba(16, 185, 129, 1)' },
-                { bg: 'rgba(236, 72, 153, 0.95)', text: 'white', border: 'rgba(236, 72, 153, 1)' },
-                { bg: 'rgba(245, 158, 11, 0.95)', text: 'white', border: 'rgba(245, 158, 11, 1)' },
-                { bg: 'rgba(239, 68, 68, 0.95)', text: 'white', border: 'rgba(239, 68, 68, 1)' }
+                { bg: 'rgba(59, 130, 246, 0.95)', text: 'white', border: 'rgba(59, 130, 246, 1)', gradient: ['#3B82F6', '#1D4ED8'] },
+                { bg: 'rgba(16, 185, 129, 0.95)', text: 'white', border: 'rgba(16, 185, 129, 1)', gradient: ['#10B981', '#059669'] },
+                { bg: 'rgba(236, 72, 153, 0.95)', text: 'white', border: 'rgba(236, 72, 153, 1)', gradient: ['#EC4899', '#BE185D'] },
+                { bg: 'rgba(245, 158, 11, 0.95)', text: 'white', border: 'rgba(245, 158, 11, 1)', gradient: ['#F59E0B', '#D97706'] },
+                { bg: 'rgba(239, 68, 68, 0.95)', text: 'white', border: 'rgba(239, 68, 68, 1)', gradient: ['#EF4444', '#DC2626'] },
+                { bg: 'rgba(139, 92, 246, 0.95)', text: 'white', border: 'rgba(139, 92, 246, 1)', gradient: ['#8B5CF6', '#7C3AED'] },
+                { bg: 'rgba(6, 182, 212, 0.95)', text: 'white', border: 'rgba(6, 182, 212, 1)', gradient: ['#06B6D4', '#0891B2'] },
+                { bg: 'rgba(34, 197, 94, 0.95)', text: 'white', border: 'rgba(34, 197, 94, 1)', gradient: ['#22C55E', '#16A34A'] },
+                { bg: 'rgba(249, 115, 22, 0.95)', text: 'white', border: 'rgba(249, 115, 22, 1)', gradient: ['#F97316', '#EA580C'] },
+                { bg: 'rgba(168, 85, 247, 0.95)', text: 'white', border: 'rgba(168, 85, 247, 1)', gradient: ['#A855F7', '#9333EA'] }
             ]
         };
         
@@ -390,7 +396,7 @@
             setupCanvas();
             setupPhysics();
             setupEventListeners();
-            setupSpeechRecognition();
+            // 腾讯云语音识别不需要初始化
             startGameLoop();
             
             showStatus('系统已就绪');
@@ -498,55 +504,117 @@
                 startY: 0
             };
             
-            // 鼠标控制
+            // 鼠标控制 - 优化鼠标拖动
             const mouseConstraint = MouseConstraint.create(engine, {
                 mouse: mouse,
                 constraint: {
-                    stiffness: 0.2,
-                    render: { visible: false }
+                    stiffness: 0.8, // 增加刚度，让拖动更精确
+                    render: { visible: false },
+                    damping: 0.1, // 减少阻尼，响应更快
+                    angularStiffness: 0.5 // 增加角刚度
                 }
             });
             
             World.add(world, mouseConstraint);
             
-            // 触摸事件处理
+            // 优化触摸拖动体验
+            let activeTouch = null;
+            let touchOffset = { x: 0, y: 0 };
+            
             canvas.addEventListener('touchstart', (e) => {
                 e.preventDefault();
-                const touch = e.touches[0];
-                const mousePos = { x: touch.clientX, y: touch.clientY };
-                
-                // 查找触摸点下的物体
-                const bodies = Matter.Composite.allBodies(world);
-                for (const body of bodies) {
-                    if (Matter.Bounds.contains(body.bounds, mousePos)) {
-                        touchControl.target = body;
-                        touchControl.startX = mousePos.x;
-                        touchControl.startY = mousePos.y;
-                        break;
+                if (e.touches.length === 1) {
+                    const touch = e.touches[0];
+                    const rect = canvas.getBoundingClientRect();
+                    const mousePos = {
+                        x: touch.clientX - rect.left,
+                        y: touch.clientY - rect.top
+                    };
+                    
+                    // 查找最近的物体
+                    const bodies = Matter.Composite.allBodies(world);
+                    let closestBody = null;
+                    let minDistance = Infinity;
+                    
+                    for (const body of bodies) {
+                        if (body.isStatic) continue;
+                        
+                        const distance = Math.sqrt(
+                            Math.pow(body.position.x - mousePos.x, 2) + 
+                            Math.pow(body.position.y - mousePos.y, 2)
+                        );
+                        
+                        // 检查是否在物体范围内（考虑物体大小）
+                        const bounds = body.bounds;
+                        const range = Math.max(bounds.max.x - bounds.min.x, bounds.max.y - bounds.min.y) / 2;
+                        
+                        if (distance < range + 20 && distance < minDistance) {
+                            closestBody = body;
+                            minDistance = distance;
+                        }
+                    }
+                    
+                    if (closestBody) {
+                        activeTouch = closestBody;
+                        touchOffset.x = mousePos.x - closestBody.position.x;
+                        touchOffset.y = mousePos.y - closestBody.position.y;
+                        
+                        // 临时增加物体的阻尼，让拖动更稳定
+                        activeTouch.originalFrictionAir = activeTouch.frictionAir;
+                        activeTouch.frictionAir = 0.9;
+                        
+                        // 暂停物理计算，避免抖动
+                        activeTouch.isSensor = true;
                     }
                 }
             });
             
             canvas.addEventListener('touchmove', (e) => {
                 e.preventDefault();
-                if (touchControl.target) {
+                if (activeTouch && e.touches.length === 1) {
                     const touch = e.touches[0];
-                    const mousePos = { x: touch.clientX, y: touch.clientY };
+                    const rect = canvas.getBoundingClientRect();
+                    const mousePos = {
+                        x: touch.clientX - rect.left,
+                        y: touch.clientY - rect.top
+                    };
                     
-                    // 移动物体
-                    Matter.Body.setPosition(touchControl.target, {
-                        x: touchControl.target.position.x + (mousePos.x - touchControl.startX),
-                        y: touchControl.target.position.y + (mousePos.y - touchControl.startY)
+                    // 平滑移动到触摸位置
+                    const targetX = mousePos.x - touchOffset.x;
+                    const targetY = mousePos.y - touchOffset.y;
+                    
+                    Matter.Body.setPosition(activeTouch, {
+                        x: targetX,
+                        y: targetY
                     });
                     
-                    touchControl.startX = mousePos.x;
-                    touchControl.startY = mousePos.y;
+                    // 设置速度为0，避免惯性
+                    Matter.Body.setVelocity(activeTouch, { x: 0, y: 0 });
+                    Matter.Body.setAngularVelocity(activeTouch, 0);
                 }
             });
             
             canvas.addEventListener('touchend', (e) => {
                 e.preventDefault();
-                touchControl.target = null;
+                if (activeTouch) {
+                    // 恢复原始属性
+                    activeTouch.frictionAir = activeTouch.originalFrictionAir || 0.01;
+                    activeTouch.isSensor = false;
+                    
+                    // 给物体一点初始速度，模拟释放效果
+                    Matter.Body.setVelocity(activeTouch, { x: 0, y: 0 });
+                    
+                    activeTouch = null;
+                }
+            });
+            
+            canvas.addEventListener('touchcancel', (e) => {
+                e.preventDefault();
+                if (activeTouch) {
+                    activeTouch.frictionAir = activeTouch.originalFrictionAir || 0.01;
+                    activeTouch.isSensor = false;
+                    activeTouch = null;
+                }
             });
         }
         
@@ -771,51 +839,123 @@
             showStatus('已清除所有文字');
         }
         
-        // 语音相关
-        function setupSpeechRecognition() {
-            if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+        // 腾讯云语音识别相关
+        let audioRecorder = null;
+        let audioStream = null;
+        
+        // 腾讯云语音识别配置说明
+        // 注意：腾讯云语音识别需要服务器端签名，前端无法直接调用
+        // 如需使用腾讯云ASR，需要搭建服务器端代理
+        // 当前使用Web Speech API作为替代方案，支持中文识别
+        
+        // 获取腾讯云签名
+        function getSignature(params) {
+            const crypto = window.crypto || window.msCrypto;
+            const encoder = new TextEncoder();
+            const data = encoder.encode(params);
+            
+            return crypto.subtle.importKey(
+                'raw',
+                encoder.encode(TENCENT_CONFIG.secretKey),
+                { name: 'HMAC', hash: 'SHA256' },
+                false,
+                ['sign']
+            ).then(key => {
+                return crypto.subtle.sign('HMAC', key, data);
+            }).then(signature => {
+                return btoa(String.fromCharCode(...new Uint8Array(signature)));
+            });
+        }
+        
+        // 移除不再需要的函数，直接使用Web Speech API
+        
+        // Web Speech API实现
+        async function useWebSpeechAPI() {
+            return new Promise((resolve, reject) => {
+                if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+                    reject(new Error('浏览器不支持语音识别'));
+                    return;
+                }
+
                 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-                recognition = new SpeechRecognition();
+                const recognition = new SpeechRecognition();
+                
                 recognition.continuous = false;
                 recognition.interimResults = false;
                 recognition.lang = 'zh-CN';
                 
-                recognition.onresult = (event) => {
-                    const text = event.results[0][0].transcript.trim();
-                    if (text) {
-                        launchText(text);
-                        document.getElementById('textInput').value = text;
-                    }
-                };
+                let hasResult = false;
                 
-                recognition.onend = () => {
-                    isListening = false;
-                    updateVoiceButton();
+                recognition.onresult = (event) => {
+                    hasResult = true;
+                    const transcript = event.results[0][0].transcript.trim();
+                    console.log('语音识别结果:', transcript);
+                    resolve(transcript);
                 };
                 
                 recognition.onerror = (event) => {
-                    isListening = false;
-                    updateVoiceButton();
-                    showStatus('语音识别失败', true);
+                    console.error('语音识别错误:', event.error);
+                    let errorMsg = '语音识别失败';
+                    switch(event.error) {
+                        case 'no-speech':
+                            errorMsg = '没有检测到语音';
+                            break;
+                        case 'audio-capture':
+                            errorMsg = '无法访问麦克风';
+                            break;
+                        case 'not-allowed':
+                            errorMsg = '请允许麦克风访问权限';
+                            break;
+                        default:
+                            errorMsg = '语音识别失败: ' + event.error;
+                    }
+                    reject(new Error(errorMsg));
                 };
-            }
+                
+                recognition.onend = () => {
+                    if (!hasResult) {
+                        reject(new Error('没有识别到语音'));
+                    }
+                };
+                
+                try {
+                    recognition.start();
+                } catch (error) {
+                    reject(new Error('无法启动语音识别'));
+                }
+            });
         }
         
-        function toggleVoiceInput() {
-            if (!recognition) {
-                showStatus('浏览器不支持语音识别', true);
-                return;
-            }
-            
+        // 语音输入控制 - 直接使用Web Speech API
+        async function toggleVoiceInput() {
             if (isListening) {
-                recognition.stop();
+                // 停止识别
                 isListening = false;
+                updateVoiceButton();
+                showStatus('已停止');
             } else {
-                recognition.start();
-                isListening = true;
+                // 开始语音识别
+                try {
+                    isListening = true;
+                    updateVoiceButton();
+                    showStatus('请说话...');
+                    
+                    const text = await useWebSpeechAPI();
+                    
+                    if (text) {
+                        launchText(text);
+                        document.getElementById('textInput').value = text;
+                        showStatus('识别成功');
+                    }
+                    
+                } catch (error) {
+                    console.error('语音识别错误:', error);
+                    showStatus(error.message || '语音识别失败', true);
+                } finally {
+                    isListening = false;
+                    updateVoiceButton();
+                }
             }
-            
-            updateVoiceButton();
         }
         
         function updateVoiceButton() {
