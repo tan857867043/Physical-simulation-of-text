@@ -2,9 +2,13 @@
 <html lang="zh">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>文字顶满方块的物理系统</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>物理系统 - 移动版</title>
     <script src="matter.min.js"></script>
+    <script>
+        // 解构 Matter.js 模块
+        const { Engine, Render, World, Bodies, Body, Composite, Composites, Constraint, Mouse, MouseConstraint, Events } = Matter;
+    </script>
     
     <style>
         /* 基础样式 */
@@ -23,501 +27,478 @@
             --red-600: #DC2626;
             --blue-50: #EFF6FF;
             --blue-700: #1D4ED8;
+            --green-500: #10B981;
+            --orange-500: #F97316;
         }
         
         /* 通用样式 */
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
         body {
-            font-family: 'Inter', system-ui, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', system-ui, sans-serif;
             background-color: var(--gray-50);
             margin: 0;
             padding: 0;
-            min-height: 100vh;
+            height: 100vh;
+            overflow: hidden;
+            touch-action: none;
+            -webkit-user-select: none;
+            user-select: none;
         }
         
-        .container {
-            max-width: 1024px;
-            margin: 0 auto;
-            padding: 1.5rem 1rem;
-        }
-        
-        /* 布局样式 */
-        .mx-auto { margin-left: auto; margin-right: auto; }
-        .px-4 { padding-left: 1rem; padding-right: 1rem; }
-        .py-6 { padding-top: 1.5rem; padding-bottom: 1.5rem; }
-        .max-w-5xl { max-width: 64rem; }
-        .mb-6 { margin-bottom: 1.5rem; }
-        .mb-2 { margin-bottom: 0.5rem; }
-        .mb-1\.5 { margin-bottom: 0.375rem; }
-        .mt-4 { margin-top: 1rem; }
-        .p-5 { padding: 1.25rem; }
-        .p-3 { padding: 0.75rem; }
-        .px-5 { padding-left: 1.25rem; padding-right: 1.25rem; }
-        .py-2\.5 { padding-top: 0.625rem; padding-bottom: 0.625rem; }
-        .px-3 { padding-left: 0.75rem; padding-right: 0.75rem; }
-        .py-2 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
-        .px-4 { padding-left: 1rem; padding-right: 1rem; }
-        .ml-2 { margin-left: 0.5rem; }
-        .mr-2 { margin-right: 0.5rem; }
-        .gap-2 { gap: 0.5rem; }
-        .gap-3 { gap: 0.75rem; }
-        .gap-4 { gap: 1rem; }
-        
-        /* 文本样式 */
-        .text-center { text-align: center; }
-        .text-lg { font-size: 1.125rem; }
-        .text-sm { font-size: 0.875rem; }
-        .text-2xl { font-size: 1.5rem; }
-        .font-bold { font-weight: 700; }
-        .font-medium { font-weight: 500; }
-        .text-white { color: white; }
-        .text-dark { color: var(--dark); }
-        .text-gray-600 { color: var(--gray-600); }
-        .text-gray-700 { color: var(--gray-700); }
-        .text-blue-700 { color: var(--blue-700); }
-        
-        h1 {
-            font-size: clamp(1.7rem, 4vw, 2.3rem);
-            margin: 0 0 0.5rem 0;
-        }
-        
-        /* 组件样式 */
-        .bg-white { background-color: white; }
-        .bg-primary { background-color: var(--primary); }
-        .bg-secondary { background-color: var(--secondary); }
-        .bg-accent { background-color: var(--accent); }
-        .bg-gray-600 { background-color: var(--gray-600); }
-        .bg-vortex { background-color: var(--vortex); }
-        .bg-red-500 { background-color: var(--red-500); }
-        .bg-blue-50 { background-color: var(--blue-50); }
-        
-        .hover\:bg-primary\/90:hover { background-color: rgba(59, 130, 246, 0.9); }
-        .hover\:bg-secondary\/90:hover { background-color: rgba(16, 185, 129, 0.9); }
-        .hover\:bg-accent\/90:hover { background-color: rgba(236, 72, 153, 0.9); }
-        .hover\:bg-gray-700:hover { background-color: var(--gray-700); }
-        .hover\:bg-vortex\/90:hover { background-color: rgba(139, 92, 246, 0.9); }
-        .hover\:bg-red-600:hover { background-color: var(--red-600); }
-        
-        .rounded-xl { border-radius: 0.75rem; }
-        .rounded-lg { border-radius: 0.5rem; }
-        .rounded-l-lg { border-top-left-radius: 0.5rem; border-bottom-left-radius: 0.5rem; }
-        .rounded-r-lg { border-top-right-radius: 0.5rem; border-bottom-right-radius: 0.5rem; }
-        .rounded-full { border-radius: 9999px; }
-        
-        .shadow-md { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); }
-        .shadow-lg { box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); }
-        
-        .border { border-width: 1px; }
-        .border-gray-300 { border-color: var(--gray-300); }
-        
-        /* 布局组件 */
-        .flex { display: flex; }
-        .flex-1 { flex: 1 1 0%; }
-        .flex-col { flex-direction: column; }
-        .flex-wrap { flex-wrap: wrap; }
-        .items-center { align-items: center; }
-        .justify-center { justify-content: center; }
-        .min-w-\[200px\] { min-width: 200px; }
-        .w-full { width: 100%; }
-        .w-3 { width: 0.75rem; }
-        .h-3 { height: 0.75rem; }
-        .w-16 { width: 4rem; }
-        .h-16 { height: 4rem; }
-        .w-12 { width: 3rem; }
-        .h-12 { height: 3rem; }
-        .inline-block { display: inline-block; }
-        .hidden { display: none; }
-        .relative { position: relative; }
-        .absolute { position: absolute; }
-        .overflow-hidden { overflow: hidden; }
-        
-        .grid { display: grid; }
-        .grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
-        
-        /* 表单元素 */
-        input[type="text"] {
-            width: 100%;
-            padding: 0.625rem 1rem;
-            border: 1px solid var(--gray-300);
-            border-radius: 0.5rem 0 0 0.5rem;
-            outline: none;
-        }
-        
-        input[type="text"]:focus {
-            outline: none;
-            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
-        }
-        
-        button {
-            cursor: pointer;
-            border: none;
-            font-family: inherit;
-            font-size: 1rem;
+        .app-container {
             display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-            transition: all 0.3s ease;
+            flex-direction: column;
+            height: 100vh;
+            position: relative;
         }
         
-        /* 动画 */
+        /* 主内容区域 */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        /* 物理画布区域 */
+        .canvas-container {
+            flex: 1;
+            position: relative;
+            background-color: white;
+            margin: 0.5rem;
+            border-radius: 1rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        
+        #physicsCanvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        
+        /* 视觉元素 */
         .vortex-core {
             position: absolute;
-            border-radius: 9999px;
+            width: 3rem;
+            height: 3rem;
+            background-color: var(--vortex);
+            border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             color: white;
-            box-shadow: 0 0 40px rgba(139, 92, 246, 0.8), 
-                        0 0 80px rgba(139, 92, 246, 0.5),
-                        0 0 120px rgba(139, 92, 246, 0.3);
+            box-shadow: 0 0 2rem rgba(139, 92, 246, 0.5);
             animation: vortex-pulse 3s infinite;
-        }
-        
-        @keyframes vortex-pulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.05); }
+            z-index: 10;
         }
         
         .launcher {
             position: absolute;
+            width: 2.5rem;
+            height: 2.5rem;
             background-color: var(--primary);
-            border-radius: 9999px;
+            border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             color: white;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            z-index: 10;
         }
         
-        .btn-active {
+        @keyframes vortex-pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+        
+        /* 底部控制区域 */
+        .bottom-controls {
+            background-color: white;
+            padding: 0.75rem;
+            box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        
+        .input-section {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 0.75rem;
+        }
+        
+        .text-input {
+            flex: 1;
+            padding: 0.75rem 1rem;
+            border: 1px solid var(--gray-300);
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            outline: none;
+            -webkit-appearance: none;
+        }
+        
+        .text-input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+        }
+        
+        .btn {
+            padding: 0.75rem 1rem;
+            border: none;
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 3rem;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        .btn:active {
             transform: scale(0.95);
         }
         
-        .launch-animation {
-            animation: launch-pulse 0.5s ease-out;
+        .btn-primary {
+            background-color: var(--secondary);
+            color: white;
         }
         
-        @keyframes launch-pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.2); }
-            100% { transform: scale(1); }
-        }
-        
-        .recording-indicator {
-            display: inline-block;
-            width: 0.75rem;
-            height: 0.75rem;
+        .btn-danger {
             background-color: var(--red-500);
-            border-radius: 9999px;
-            margin-left: 0.5rem;
+            color: white;
+        }
+        
+        .btn-voice {
+            background-color: var(--primary);
+            color: white;
+        }
+        
+        .btn-voice.recording {
+            background-color: var(--red-500);
             animation: pulse 1.5s infinite;
+        }
+        
+        /* 开关区域 */
+        .switch-section {
+            display: flex;
+            gap: 0.5rem;
+            justify-content: space-around;
+        }
+        
+        .switch-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+            color: var(--gray-700);
+        }
+        
+        .switch {
+            position: relative;
+            width: 3rem;
+            height: 1.5rem;
+            background-color: var(--gray-300);
+            border-radius: 0.75rem;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+        
+        .switch.active {
+            background-color: var(--secondary);
+        }
+        
+        .switch-slider {
+            position: absolute;
+            top: 0.125rem;
+            left: 0.125rem;
+            width: 1.25rem;
+            height: 1.25rem;
+            background-color: white;
+            border-radius: 50%;
+            transition: transform 0.2s ease;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+        
+        .switch.active .switch-slider {
+            transform: translateX(1.5rem);
+        }
+        
+        /* 状态消息 */
+        .status-message {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 1rem 1.5rem;
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+        }
+        
+        .status-message.show {
+            opacity: 1;
+        }
+        
+        /* 响应式设计 */
+        @media (max-width: 480px) {
+            .canvas-container {
+                margin: 0.25rem;
+                border-radius: 0.75rem;
+            }
+            
+            .bottom-controls {
+                padding: 0.5rem;
+            }
+            
+            .text-input {
+                padding: 0.625rem 0.875rem;
+                font-size: 0.875rem;
+            }
+            
+            .btn {
+                padding: 0.625rem 0.875rem;
+                font-size: 0.875rem;
+            }
+        }
+        
+        /* 图标样式 */
+        .icon {
+            font-size: 1.25rem;
         }
         
         @keyframes pulse {
             0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
+            50% { opacity: 0.7; }
         }
-        
-        .animate-spin {
-            animation: spin 1s linear infinite;
-        }
-        
-        @keyframes spin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-        }
-        
-        /* 响应式布局 */
-        @media (min-width: 640px) {
-            .sm\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-        }
-        
-        @media (min-width: 768px) {
-            .md\:flex-row { flex-direction: row; }
-            .md\:grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-        }
-        
-        /* 图标样式 */
-        .fa {
-            display: inline-block;
-            font: normal normal normal 14px/1 FontAwesome;
-            font-size: inherit;
-            text-rendering: auto;
-            -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
-        }
-        
-        .fa-microphone:before { content: "🎤"; }
-        .fa-paper-plane:before { content: "📤"; }
-        .fa-random:before { content: "🔀"; }
-        .fa-moon-o:before { content: "🌙"; }
-        .fa-sync:before { content: "🔄"; }
-        .fa-trash:before { content: "🗑️"; }
-        .fa-rocket:before { content: "🚀"; }
-        .fa-info-circle:before { content: "ℹ️"; }
     </style>
 </head>
-<body class="bg-gray-50 font-inter min-h-screen">
-    <div class="container mx-auto px-4 py-6 max-w-5xl">
-        <header class="text-center mb-6">
-            <h1 class="text-[clamp(1.7rem,4vw,2.3rem)] font-bold text-dark mb-2">文字顶满方块的物理系统</h1>
-            <p class="text-gray-600 text-lg">文字完全填充方块，不留边距</p>
-        </header>
-
-        <!-- 控制区域 -->
-        <div class="bg-white rounded-xl shadow-md p-5 mb-6">
-            <div class="flex flex-col md:flex-row gap-4 items-center">
-                <div class="flex-1 w-full">
-                    <label class="block text-sm font-medium text-gray-700 mb-1.5">输入方式</label>
-                    <div class="flex flex-wrap gap-3">
-                        <button id="startVoice" class="bg-primary hover:bg-primary/90 text-white px-5 py-2.5 rounded-lg transition-all duration-300 flex items-center gap-2">
-                            <i class="fa fa-microphone"></i>
-                            <span>语音输入</span>
-                            <span id="voiceDot" class="recording-indicator hidden"></span>
-                        </button>
-                        
-                        <div class="flex-1 min-w-[200px]">
-                            <div class="flex">
-                                <input type="text" id="textInput" 
-                                    class="flex-1 px-4 py-2.5 border border-gray-300 rounded-l-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                                    placeholder="输入文字...">
-                                <button id="addText" class="bg-secondary hover:bg-secondary/90 text-white px-4 py-2.5 rounded-r-lg transition-colors duration-300">
-                                    <i class="fa fa-paper-plane"></i>
-                                </button>
-                            </div>
-                        </div>
+<body>
+    <div class="app-container">
+        <div class="main-content">
+            <div class="canvas-container">
+                <canvas id="physicsCanvas"></canvas>
+                
+                <!-- 漩涡核心 -->
+                <div id="vortexVisual" class="vortex-core">
+                    <span class="icon">🌀</span>
+                </div>
+                
+                <!-- 发射器 -->
+                <div id="launcherVisual" class="launcher">
+                    <span class="icon">🚀</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 底部控制区域 -->
+        <div class="bottom-controls">
+            <!-- 输入区域 -->
+            <div class="input-section">
+                <input type="text" id="textInput" class="text-input" placeholder="输入文字..." maxlength="20">
+                <button id="addTextBtn" class="btn btn-primary">
+                    <span class="icon">📤</span>
+                </button>
+                <button id="voiceBtn" class="btn btn-voice">
+                    <span class="icon">🎤</span>
+                </button>
+                <button id="clearBtn" class="btn btn-danger">
+                    <span class="icon">🗑️</span>
+                </button>
+            </div>
+            
+            <!-- 开关区域 -->
+            <div class="switch-section">
+                <div class="switch-item">
+                    <span>重力</span>
+                    <div id="gravitySwitch" class="switch active">
+                        <div class="switch-slider"></div>
+                    </div>
+                </div>
+                <div class="switch-item">
+                    <span>漩涡</span>
+                    <div id="vortexSwitch" class="switch active">
+                        <div class="switch-slider"></div>
                     </div>
                 </div>
             </div>
-
-            <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-                <button id="launchRandom" class="bg-accent hover:bg-accent/90 text-white px-3 py-2 rounded-lg transition-colors duration-300 flex items-center justify-center gap-2">
-                    <i class="fa fa-random"></i>
-                    <span>随机发射</span>
-                </button>
-                
-                <button id="toggleGravity" class="bg-gray-600 hover:bg-gray-700 text-white px-3 py-2 rounded-lg transition-colors duration-300 flex items-center justify-center gap-2">
-                    <i class="fa fa-moon-o"></i>
-                    <span>重力: 开</span>
-                </button>
-                
-                <button id="toggleVortex" class="bg-vortex hover:bg-vortex/90 text-white px-3 py-2 rounded-lg transition-colors duration-300 flex items-center justify-center gap-2">
-                    <i class="fa fa-sync"></i>
-                    <span>漩涡: 开</span>
-                </button>
-                
-                <button id="clearAll" class="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg transition-colors duration-300 flex items-center justify-center gap-2">
-                    <i class="fa fa-trash"></i>
-                    <span>清除所有</span>
-                </button>
-            </div>
         </div>
-
-        <!-- 物理模拟区域 -->
-        <div class="relative bg-white rounded-xl shadow-lg overflow-hidden">
-            <canvas id="physicsCanvas" class="w-full" height="600"></canvas>
-            
-            <!-- 漩涡核心（视觉效果） -->
-            <div id="vortexVisual" class="vortex-core w-16 h-16 bg-vortex/80">
-                <i class="fa fa-sync text-2xl animate-spin"></i>
-            </div>
-            
-            <!-- 发射器（视觉效果）- 位置上移 -->
-            <div id="launcherVisual" class="launcher w-12 h-12">
-                <i class="fa fa-rocket"></i>
-            </div>
-        </div>
-
-        <!-- 状态提示区域 -->
-        <div id="statusMessage" class="mt-4 p-3 rounded-lg bg-blue-50 text-blue-700 hidden">
-            <i class="fa fa-info-circle mr-2"></i>
-            <span id="statusText">系统就绪</span>
-        </div>
-
+        
+        <!-- 状态消息 -->
+        <div id="statusMessage" class="status-message"></div>
     </div>
 
     <script>
-        window.onload = function() {
-            // DOM元素引用
-            const canvas = document.getElementById('physicsCanvas');
-            const ctx = canvas.getContext('2d');
-            const textInput = document.getElementById('textInput');
-            const addTextBtn = document.getElementById('addText');
-            const startVoiceBtn = document.getElementById('startVoice');
-            const voiceDot = document.getElementById('voiceDot');
-            const launchRandomBtn = document.getElementById('launchRandom');
-            const toggleGravityBtn = document.getElementById('toggleGravity');
-            const toggleVortexBtn = document.getElementById('toggleVortex');
-
-            const clearAllBtn = document.getElementById('clearAll');
-            const vortexVisual = document.getElementById('vortexVisual');
-            const launcherVisual = document.getElementById('launcherVisual');
-            const statusMessage = document.getElementById('statusMessage');
-            const statusText = document.getElementById('statusText');
-            
-            // ===== 系统可调参数配置 =====
-            const CONFIG = {
-                // 物理参数
-                physics: {
-                    gravity: 0.8,           // 重力大小
-                    timeScale: 1,           // 时间缩放
-                    fps: 60                 // 帧率
-                },
-                // 漩涡参数
-                vortex: {
-                    strength: 0.005,        // 漩涡力度
-                    captureRadius: 50,      // 捕获半径
-                    rotationForce: 0.0005,  // 旋转力
-                    xPosition: 0.75         // 水平位置(0-1)
-                },
-                // 方块参数
-                block: {
-                    size: 40,               // 方块大小
-                    gap: 5,                 // 方块间隙
-                    restitution: 0.6,       // 弹性
-                    friction: 0.1,          // 摩擦力
-                    frictionAir: 0.03,      // 空气阻力
-                    density: 0.04,          // 密度
-                    showBlocks: false       // 是否显示方块背景
-                },
-                // 发射参数
-                launcher: {
-                    x: 100,                 // 发射器X位置
-                    y: 150,                 // 发射器Y位置
-                    baseForce: 12,          // 基础发射力
-                    forceVariation: 10,      // 力度变化范围
-                    angleRange: 60          // 角度范围(±30度)
-                },
-                // 关节参数
-                joint: {
-                    stiffness: 0.1,         // 刚度
-                    damping: 0.1            // 阻尼
-                },
-                // 语音参数
-                speech: {
-                    lang: 'zh-CN',          // 语言
-                    volume: 1,              // 音量
-                    rate: 1,                // 语速
-                    pitch: 1                // 音调
-                }
-            };
-            
-            // 方块显示状态 - 使用配置参数
-            let showBlocks = CONFIG.block.showBlocks;
-            
-            // 显示状态消息的函数
-            function showStatus(message, isError = false) {
-                statusText.textContent = message;
-                statusMessage.classList.remove('hidden', 'bg-blue-50', 'text-blue-700', 'bg-red-50', 'text-red-700');
-                
-                if (isError) {
-                    statusMessage.classList.add('bg-red-50', 'text-red-700');
-                } else {
-                    statusMessage.classList.add('bg-blue-50', 'text-blue-700');
-                }
-                
-                setTimeout(() => {
-                    statusMessage.classList.add('hidden');
-                }, 3000);
-            }
-            
-            // 物理引擎初始化
-            const { Engine, World, Bodies, Body, Constraint, Mouse, MouseConstraint } = Matter;
-            
-            // 创建引擎 - 使用配置参数
-            const engine = Engine.create({
-                timing: {
-                    timeScale: CONFIG.physics.timeScale,
-                    delta: 1000 / CONFIG.physics.fps // 根据fps计算delta
-                }
-            });
-            engine.world.gravity.y = CONFIG.physics.gravity;
-            
-            // 初始化Canvas尺寸，考虑设备像素比
-            function initialResizeCanvas() {
-                const container = canvas.parentElement;
-                const dpr = window.devicePixelRatio || 1;
-                const rect = container.getBoundingClientRect();
-                
-                canvas.width = rect.width * dpr;
-                canvas.height = 600 * dpr;
-                canvas.style.width = `${rect.width}px`;
-                canvas.style.height = '600px';
-                
-                // 调整上下文缩放
-                ctx.scale(dpr, dpr);
-                
-                // 定位视觉元素 - 漩涡位置与物理位置一致
-                vortexVisual.style.left = `${rect.width * CONFIG.vortex.xPosition - 32}px`;
-                vortexVisual.style.top = `300px`;
-                
-                // 发射器位置上移
-                launcherVisual.style.left = '30px';
-                launcherVisual.style.top = `150px`;
-            }
-            
-            initialResizeCanvas();
-            
-            // 创建世界边界
-            const ground = Bodies.rectangle(canvas.width / (2 * window.devicePixelRatio || 1), 
-                                           600 - 10, 
-                                           canvas.width / (window.devicePixelRatio || 1), 
-                                           20, 
-                                           { isStatic: true });
-            const ceiling = Bodies.rectangle(canvas.width / (2 * window.devicePixelRatio || 1), 
-                                            10, 
-                                            canvas.width / (window.devicePixelRatio || 1), 
-                                            20, 
-                                            { isStatic: true });
-            const leftWall = Bodies.rectangle(10, 
-                                             300, 
-                                             20, 
-                                             600, 
-                                             { isStatic: true });
-            const rightWall = Bodies.rectangle(canvas.width / (window.devicePixelRatio || 1) - 10, 
-                                              300, 
-                                              20, 
-                                              600, 
-                                              { isStatic: true });
-            
-            // 漩涡设置 - 使用配置参数
-            const vortexCenter = { 
-                x: canvas.parentElement.getBoundingClientRect().width * CONFIG.vortex.xPosition,
-                y: 300 
-            };
-            const vortexStrength = CONFIG.vortex.strength;
-            let vortexActive = true;
-            
-            // 发射器位置 - 使用配置参数
-            const launcherPosition = { 
-                x: CONFIG.launcher.x, 
-                y: CONFIG.launcher.y 
-            };
-            
-            // 存储文字方块组
-            let characterGroups = [];
-            
-            // 颜色库
-            const colors = [
+        // 全局变量
+        let engine, world, canvas, ctx;
+        let characterGroups = [];
+        let vortexActive = true;
+        let gravityActive = true;
+        let recognition = null;
+        let isListening = false;
+        
+        // 配置
+        const CONFIG = {
+            physics: {
+                gravity: 1.0, // 优化重力加速度
+                timeScale: 1,
+                fps: 60
+            },
+            vortex: {
+                strength: 0.006, // 增强漩涡效果
+                captureRadius: 60, // 增大影响范围
+                rotationForce: 0.0006, // 增强旋转力
+                xPosition: 0.75
+            },
+            block: {
+                size: 35,
+                gap: 4,
+                restitution: 0.6, // 优化弹性系数
+                friction: 0.1, // 优化摩擦力
+                frictionAir: 0.005, // 减少空气阻力
+                density: 0.015, // 优化密度
+                collisionDelay: 600, // 缩短碰撞延迟
+                scaleDuration: 400 // 缩短缩放动画时间
+            },
+            launcher: {
+                x: 100,
+                y: 150,
+                baseForce: 20, // 增强发射力度
+                forceVariation: 8, // 优化力度变化范围
+                angleRange: 25 // 优化发射角度范围
+            },
+            colors: [
                 { bg: 'rgba(59, 130, 246, 0.95)', text: 'white', border: 'rgba(59, 130, 246, 1)' },
                 { bg: 'rgba(16, 185, 129, 0.95)', text: 'white', border: 'rgba(16, 185, 129, 1)' },
                 { bg: 'rgba(236, 72, 153, 0.95)', text: 'white', border: 'rgba(236, 72, 153, 1)' },
                 { bg: 'rgba(245, 158, 11, 0.95)', text: 'white', border: 'rgba(245, 158, 11, 1)' },
-                { bg: 'rgba(239, 68, 68, 0.95)', text: 'white', border: 'rgba(239, 68, 68, 1)' },
-                { bg: 'rgba(139, 92, 246, 0.95)', text: 'white', border: 'rgba(139, 92, 246, 1)' }
-            ];
+                { bg: 'rgba(239, 68, 68, 0.95)', text: 'white', border: 'rgba(239, 68, 68, 1)' }
+            ]
+        };
+        
+        // 初始化
+        function init() {
+            setupCanvas();
+            setupPhysics();
+            setupEventListeners();
+            setupSpeechRecognition();
+            startGameLoop();
             
-            // 随机词语库
-            const randomWords = [
-                '天', '地', '日', '月', '山', '水', '风', '云',
-                '春', '夏', '秋', '冬', '花', '鸟', '树', '木'
-            ];
+            showStatus('系统已就绪');
+        }
+        
+        // 设置画布
+        function setupCanvas() {
+            canvas = document.getElementById('physicsCanvas');
+            ctx = canvas.getContext('2d');
             
-            // 添加边界到世界
-            World.add(engine.world, [ground, ceiling, leftWall, rightWall]);
+            const resizeCanvas = () => {
+                const container = canvas.parentElement;
+                const rect = container.getBoundingClientRect();
+                const dpr = window.devicePixelRatio || 1;
+                
+                canvas.width = rect.width * dpr;
+                canvas.height = rect.height * dpr;
+                canvas.style.width = rect.width + 'px';
+                canvas.style.height = rect.height + 'px';
+                
+                ctx.scale(dpr, dpr);
+                
+                // 更新视觉元素位置
+                const vortexVisual = document.getElementById('vortexVisual');
+                const launcherVisual = document.getElementById('launcherVisual');
+                
+                vortexVisual.style.left = (rect.width * CONFIG.vortex.xPosition - 24) + 'px';
+                vortexVisual.style.top = (rect.height * 0.5 - 24) + 'px';
+                
+                launcherVisual.style.left = (CONFIG.launcher.x - 20) + 'px';
+                launcherVisual.style.top = (CONFIG.launcher.y - 20) + 'px';
+                
+                // 更新墙体位置
+                if (world) {
+                    updateWalls();
+                }
+            };
             
-            // 鼠标交互
+            // 确保触摸事件能正确获取坐标
+            canvas.style.touchAction = 'none';
+            
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+        }
+        
+        // 墙体边界
+        let walls = [];
+        
+        // 创建/更新墙体
+        function updateWalls() {
+            const { World, Bodies } = Matter;
+            
+            // 移除旧墙体
+            if (walls.length > 0) {
+                World.remove(world, walls);
+                walls = [];
+            }
+            
+            // 创建新墙体
+            const container = canvas.parentElement;
+            const rect = container.getBoundingClientRect();
+            
+            // 优化墙体参数
+            const wallThickness = 30; // 增加墙体厚度
+            const wallOptions = {
+                isStatic: true,
+                friction: 0.3,
+                restitution: 0.2,
+                collisionFilter: {
+                    group: -1 // 确保墙体不会相互碰撞
+                }
+            };
+            
+            const ground = Bodies.rectangle(rect.width / 2, rect.height, rect.width + 100, wallThickness, wallOptions);
+            const ceiling = Bodies.rectangle(rect.width / 2, 0, rect.width + 100, wallThickness, wallOptions);
+            const leftWall = Bodies.rectangle(0, rect.height / 2, wallThickness, rect.height + 100, wallOptions);
+            const rightWall = Bodies.rectangle(rect.width, rect.height / 2, wallThickness, rect.height + 100, wallOptions);
+            
+            walls = [ground, ceiling, leftWall, rightWall];
+            World.add(world, walls);
+        }
+        
+        // 设置物理引擎
+        function setupPhysics() {
+            const { Engine, World, Bodies, Body, Constraint, Mouse, MouseConstraint } = Matter;
+            
+            engine = Engine.create({
+                timing: {
+                    timeScale: CONFIG.physics.timeScale,
+                    delta: 1000 / CONFIG.physics.fps
+                }
+            });
+            world = engine.world;
+            world.gravity.y = CONFIG.physics.gravity;
+            
+            // 创建初始墙体
+            updateWalls();
+            
+            // 鼠标/触摸控制
             const mouse = Mouse.create(canvas);
+            const touchControl = {
+                element: canvas,
+                target: null,
+                startX: 0,
+                startY: 0
+            };
+            
+            // 鼠标控制
             const mouseConstraint = MouseConstraint.create(engine, {
                 mouse: mouse,
                 constraint: {
@@ -526,624 +507,422 @@
                 }
             });
             
-            World.add(engine.world, mouseConstraint);
+            World.add(world, mouseConstraint);
             
-            // 调整尺寸函数
-            function resizeCanvas() {
-                const container = canvas.parentElement;
-                const dpr = window.devicePixelRatio || 1;
-                const rect = container.getBoundingClientRect();
+            // 触摸事件处理
+            canvas.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                const touch = e.touches[0];
+                const mousePos = { x: touch.clientX, y: touch.clientY };
                 
-                // 保存当前鼠标比例
-                mouse.pixelRatio = dpr;
+                // 查找触摸点下的物体
+                const bodies = Matter.Composite.allBodies(world);
+                for (const body of bodies) {
+                    if (Matter.Bounds.contains(body.bounds, mousePos)) {
+                        touchControl.target = body;
+                        touchControl.startX = mousePos.x;
+                        touchControl.startY = mousePos.y;
+                        break;
+                    }
+                }
+            });
+            
+            canvas.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                if (touchControl.target) {
+                    const touch = e.touches[0];
+                    const mousePos = { x: touch.clientX, y: touch.clientY };
+                    
+                    // 移动物体
+                    Matter.Body.setPosition(touchControl.target, {
+                        x: touchControl.target.position.x + (mousePos.x - touchControl.startX),
+                        y: touchControl.target.position.y + (mousePos.y - touchControl.startY)
+                    });
+                    
+                    touchControl.startX = mousePos.x;
+                    touchControl.startY = mousePos.y;
+                }
+            });
+            
+            canvas.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                touchControl.target = null;
+            });
+        }
+        
+        // 事件监听器
+        function setupEventListeners() {
+            const textInput = document.getElementById('textInput');
+            const addTextBtn = document.getElementById('addTextBtn');
+            const voiceBtn = document.getElementById('voiceBtn');
+            const clearBtn = document.getElementById('clearBtn');
+            const gravitySwitch = document.getElementById('gravitySwitch');
+            const vortexSwitch = document.getElementById('vortexSwitch');
+            
+            // 添加文字
+            addTextBtn.addEventListener('click', () => {
+                const text = textInput.value.trim();
+                if (text) {
+                    launchText(text);
+                    textInput.value = '';
+                }
+            });
+            
+            textInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    const text = textInput.value.trim();
+                    if (text) {
+                        launchText(text);
+                        textInput.value = '';
+                    }
+                }
+            });
+            
+            // 语音输入
+            voiceBtn.addEventListener('click', toggleVoiceInput);
+            
+            // 清除所有
+            clearBtn.addEventListener('click', clearAll);
+            
+            // 开关控制
+            gravitySwitch.addEventListener('click', toggleGravity);
+            vortexSwitch.addEventListener('click', toggleVortex);
+            
+            // 防止触摸事件的默认行为
+            document.addEventListener('touchmove', (e) => {
+                if (e.target === canvas) {
+                    e.preventDefault();
+                }
+            }, { passive: false });
+        }
+        
+        // 发射文字（带黑洞效果）
+        function launchText(text) {
+            if (!text) return;
+            
+            // 初始缩放动画
+            const initialScale = 0.1;
+            const scaleDuration = 500; // 毫秒
+            const scaleStep = (1 - initialScale) / (scaleDuration / 16); // 每帧缩放步长
+            
+            const container = canvas.parentElement;
+            const rect = container.getBoundingClientRect();
+            
+            const characters = text.split('');
+            const totalWidth = characters.length * CONFIG.block.size + (characters.length - 1) * CONFIG.block.gap;
+            const startX = Math.max(CONFIG.block.size / 2, Math.min(rect.width - totalWidth / 2, CONFIG.launcher.x));
+            const startY = CONFIG.launcher.y;
+            
+            const color = CONFIG.colors[Math.floor(Math.random() * CONFIG.colors.length)];
+            const blocks = [];
+            const joints = [];
+            
+            characters.forEach((char, index) => {
+                const x = startX - totalWidth / 2 + index * (CONFIG.block.size + CONFIG.block.gap) + CONFIG.block.size / 2;
+                const block = Bodies.rectangle(x, startY, CONFIG.block.size * initialScale, CONFIG.block.size * initialScale, {
+                    restitution: CONFIG.block.restitution,
+                    friction: CONFIG.block.friction,
+                    frictionAir: CONFIG.block.frictionAir,
+                    density: CONFIG.block.density,
+                    collisionFilter: {
+                        group: -1, // 初始不参与碰撞
+                        category: 0x0001,
+                        mask: 0x0000 // 初始不与任何物体碰撞
+                    }
+                });
                 
-                // 调整Canvas尺寸
-                canvas.width = rect.width * dpr;
-                canvas.height = 600 * dpr;
-                canvas.style.width = `${rect.width}px`;
-                canvas.style.height = '600px';
+                // 延迟后启用碰撞
+                setTimeout(() => {
+                    Matter.Body.set(block, {
+                        collisionFilter: {
+                            group: 0,
+                            category: 0x0001,
+                            mask: 0xFFFFFFFF // 启用所有碰撞
+                        }
+                    });
+                }, CONFIG.block.collisionDelay);
                 
-                // 重置上下文缩放
-                ctx.setTransform(1, 0, 0, 1, 0, 0);
-                ctx.scale(dpr, dpr);
+                // 添加缩放动画
+                let currentScale = initialScale;
+                const startTime = Date.now();
+                const scaleAnimation = () => {
+                    const elapsed = Date.now() - startTime;
+                    const progress = Math.min(elapsed / CONFIG.block.scaleDuration, 1);
+                    currentScale = initialScale + (1 - initialScale) * progress;
+                    
+                    Body.scale(block, currentScale / (currentScale - scaleStep), currentScale / (currentScale - scaleStep));
+                    
+                    if (progress < 1) {
+                        requestAnimationFrame(scaleAnimation);
+                    }
+                };
+                scaleAnimation();
                 
-                // 更新视觉元素位置 - 与物理位置一致
-                vortexVisual.style.left = `${rect.width * CONFIG.vortex.xPosition - 32}px`;
+                blocks.push({
+                    body: block,
+                    char: char,
+                    color: color,
+                    fontSize: calculateFontSize(char)
+                });
                 
-                // 发射器保持位置
-                launcherVisual.style.left = '30px';
-                launcherVisual.style.top = '150px';
+                World.add(world, block);
+            });
+            
+            // 创建连接
+            for (let i = 0; i < blocks.length - 1; i++) {
+                const joint = Matter.Constraint.create({
+                    bodyA: blocks[i].body,
+                    bodyB: blocks[i + 1].body,
+                    pointA: { x: CONFIG.block.size / 2 + CONFIG.block.gap / 2, y: 0 },
+                    pointB: { x: -CONFIG.block.size / 2 - CONFIG.block.gap / 2, y: 0 },
+                    length: 0,
+                    stiffness: 0.1,
+                    damping: 0.1
+                });
                 
-                // 更新世界边界
-                Matter.Body.setPosition(ground, { x: rect.width / 2, y: 600 - 10 });
-                Matter.Body.setSize(ground, { width: rect.width, height: 20 });
-                
-                Matter.Body.setPosition(ceiling, { x: rect.width / 2, y: 10 });
-                Matter.Body.setSize(ceiling, { width: rect.width, height: 20 });
-                
-                Matter.Body.setPosition(leftWall, { x: 10, y: 300 });
-                Matter.Body.setSize(leftWall, { width: 20, height: 600 });
-                
-                Matter.Body.setPosition(rightWall, { x: rect.width - 10, y: 300 });
-                Matter.Body.setSize(rightWall, { width: 20, height: 600 });
-                
-                // 更新漩涡中心 - 向右偏移到75%位置
-                vortexCenter.x = rect.width * CONFIG.vortex.xPosition;
-                vortexCenter.y = 300;
-                
-                // 更新发射器物理位置
-                launcherPosition.x = 50;
-                launcherPosition.y = 150;
+                joints.push(joint);
+                World.add(world, joint);
             }
             
-            window.addEventListener('resize', resizeCanvas);
+            // 发射
+            const angle = (Math.random() - 0.5) * CONFIG.launcher.angleRange * Math.PI / 180;
+            const force = CONFIG.launcher.baseForce + (Math.random() - 0.5) * CONFIG.launcher.forceVariation;
+            
+            blocks.forEach(block => {
+                Matter.Body.setVelocity(block.body, {
+                    x: Math.cos(angle) * force,
+                    y: Math.sin(angle) * force
+                });
+            });
+            
+            characterGroups.push({ blocks, joints, text });
             
             // 发射动画
-            function triggerLaunchAnimation() {
-                launcherVisual.classList.add('launch-animation');
-                setTimeout(() => {
-                    launcherVisual.classList.remove('launch-animation');
-                }, 500);
+            const launcher = document.getElementById('launcherVisual');
+            launcher.style.transform = 'scale(1.2)';
+            setTimeout(() => launcher.style.transform = 'scale(1)', 200);
+            
+            showStatus(`已发射: ${text}`);
+        }
+        
+        // 计算字体大小
+        function calculateFontSize(char) {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            let size = CONFIG.block.size;
+            
+            while (size > 8) {
+                ctx.font = `bold ${size}px system-ui`;
+                const metrics = ctx.measureText(char);
+                if (metrics.width <= CONFIG.block.size * 0.9) break;
+                size -= 2;
             }
             
-            // 按钮点击效果
-            function buttonClickEffect(button) {
-                button.classList.add('btn-active');
-                setTimeout(() => {
-                    button.classList.remove('btn-active');
-                }, 200);
-            }
+            return size;
+        }
+        
+        // 应用漩涡力
+        function applyVortexForces() {
+            if (!vortexActive) return;
             
-            // 计算最佳字体大小以完全填充方块（无边界）
-            function calculateFontSize(char, blockSize) {
-                // 创建一个临时画布用于测量文本
-                const tempCanvas = document.createElement('canvas');
-                const tempCtx = tempCanvas.getContext('2d');
-                
-                // 可用于测量的最大尺寸（完全填充方块）
-                const maxWidth = blockSize;
-                const maxHeight = blockSize;
-                
-                // 二分法查找最佳字体大小
-                let low = 8;
-                let high = blockSize * 2; // 最大可能尺寸为方块的2倍
-                let bestSize = 8;
-                
-                while (high - low > 1) {
-                    const mid = Math.floor((low + high) / 2);
-                    tempCtx.font = `bold ${mid}px Inter, system-ui, sans-serif`;
-                    const metrics = tempCtx.measureText(char);
-                    
-                    // 获取文本实际高度
-                    const textHeight = mid * 1.1; // 调整因子以更精确匹配实际高度
-                    
-                    // 文字必须完全在方块内，不留边距
-                    if (metrics.width <= maxWidth && textHeight <= maxHeight) {
-                        bestSize = mid;
-                        low = mid;
-                    } else {
-                        high = mid;
-                    }
-                }
-                
-                return bestSize;
-            }
+            const container = canvas.parentElement;
+            const rect = container.getBoundingClientRect();
+            const vortexX = rect.width * CONFIG.vortex.xPosition;
+            const vortexY = rect.height * 0.5;
             
-            // 创建文字方块组（每个方块一个文字）
-            function createCharacterBlocks(text, x, y) {
-                // 分割文字为单个字符
-                const characters = text.split('');
-                if (characters.length === 0) return null;
-                
-                // 方块参数 - 使用配置参数
-                const blockSize = CONFIG.block.size;
-                const gap = CONFIG.block.gap; // 方块之间的间隙
-                
-                // 整个组的总宽度
-                const totalWidth = characters.length * blockSize + (characters.length - 1) * gap;
-                
-                // 防止长文字卡墙 - 计算安全的发射位置
-                const minSafeX = 30 + totalWidth / 2; // 左边界安全距离
-                const maxSafeX = canvas.width / (window.devicePixelRatio || 1) - 30 - totalWidth / 2; // 右边界安全距离
-                
-                // 调整发射位置，确保不会卡墙
-                const safeX = Math.max(minSafeX, Math.min(x, maxSafeX));
-                
-                // 为整个组选择一个颜色主题
-                const color = colors[Math.floor(Math.random() * colors.length)];
-                
-                // 存储方块和关节
-                const blocks = [];
-                const joints = [];
-                
-                // 创建每个字符的方块
-                characters.forEach((char, index) => {
-                    // 计算每个方块的初始位置 - 使用安全的X坐标
-                    const blockX = safeX - totalWidth / 2 + index * (blockSize + gap) + blockSize / 2;
+            characterGroups.forEach(group => {
+                group.blocks.forEach(block => {
+                    const dx = vortexX - block.body.position.x;
+                    const dy = vortexY - block.body.position.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
                     
-                    const block = Bodies.rectangle(
-                        blockX, 
-                        y, 
-                        blockSize, 
-                        blockSize, 
-                        { 
-                            restitution: CONFIG.block.restitution,
-                            friction: CONFIG.block.friction,
-                            frictionAir: CONFIG.block.frictionAir,
-                            density: CONFIG.block.density
-                        }
-                    );
-                    
-                    // 计算适合当前字符的字体大小（完全填充方块）
-                    const fontSize = calculateFontSize(char, blockSize);
-                    
-                    // 存储方块信息
-                    blocks.push({
-                        body: block,
-                        char: char,
-                        color: color,
-                        fontSize: fontSize
-                    });
-                    
-                    World.add(engine.world, block);
-                });
-                
-                // 创建连接方块的柔性关节
-                for (let i = 0; i < blocks.length - 1; i++) {
-                    const joint = Constraint.create({
-                        bodyA: blocks[i].body,
-                        bodyB: blocks[i + 1].body,
-                        pointA: { x: blockSize / 2 + gap / 2, y: 0 },
-                        pointB: { x: -blockSize / 2 - gap / 2, y: 0 },
-                        length: 0,
-                        stiffness: CONFIG.joint.stiffness,
-                        damping: CONFIG.joint.damping
-                    });
-                    
-                    joints.push(joint);
-                    World.add(engine.world, joint);
-                }
-                
-                // 返回完整的文字方块组
-                return {
-                    blocks,
-                    joints,
-                    fullText: text
-                };
-            }
-            
-            // 发射文字方块组
-            function launchWord(text) {
-                if (!text || text.trim() === '') {
-                    showStatus('请输入文字后再发射', true);
-                    return null;
-                }
-                
-                triggerLaunchAnimation();
-                const characterGroup = createCharacterBlocks(text, launcherPosition.x, launcherPosition.y);
-                if (!characterGroup) return null;
-                
-                // 随机发射角度和力度 - 使用配置参数
-                const angle = (Math.random() * CONFIG.launcher.angleRange - CONFIG.launcher.angleRange/2) * Math.PI / 180;
-                const baseForce = CONFIG.launcher.baseForce + Math.random() * CONFIG.launcher.forceVariation;
-                
-                // 对每个方块应用发射力
-                characterGroup.blocks.forEach((block, index) => {
-                    const forceVariation = 1 + (index - (characterGroup.blocks.length - 1) / 2) * 0.1;
-                    const force = baseForce * forceVariation;
-                    
-                    Body.setVelocity(block.body, {
-                        x: Math.cos(angle) * force,
-                        y: Math.sin(angle) * force
-                    });
-                });
-                
-                // 存储文字方块组
-                characterGroups.push(characterGroup);
-                showStatus(`已发射: ${text}`);
-                return characterGroup;
-            }
-            
-            // 检查漩涡捕获
-            function checkVortexCapture() {
-                for (let i = characterGroups.length - 1; i >= 0; i--) {
-                    const group = characterGroups[i];
-                    let isCaptured = false;
-                    
-                    // 检查任何一个方块是否进入漩涡范围
-                    for (const block of group.blocks) {
-                        const dx = vortexCenter.x - block.body.position.x;
-                        const dy = vortexCenter.y - block.body.position.y;
-                        const distance = Math.sqrt(dx * dx + dy * dy);
+                    if (distance > 0 && distance < 200) {
+                        const force = CONFIG.vortex.strength / distance;
+                        const rotationForce = CONFIG.vortex.rotationForce;
+                        const angle = Math.atan2(dy, dx) + Math.PI / 2;
                         
-                        if (distance < CONFIG.vortex.captureRadius) {
-                            isCaptured = true;
-                            break;
-                        }
-                    }
-                    
-                    // 如果被吸入，移除整个组
-                    if (isCaptured) {
-                        // 移除所有方块
-                        group.blocks.forEach(block => {
-                            World.remove(engine.world, block.body);
+                        Matter.Body.applyForce(block.body, block.body.position, {
+                            x: (dx / distance) * force + Math.cos(angle) * rotationForce,
+                            y: (dy / distance) * force + Math.sin(angle) * rotationForce
                         });
-                        
-                        // 移除所有关节
-                        group.joints.forEach(joint => {
-                            World.remove(engine.world, joint);
-                        });
-                        
-                        // 朗读完整文字
-                        speakText(group.fullText);
-                        
-                        // 从数组中移除
-                        characterGroups.splice(i, 1);
                     }
-                }
-            }
-            
-            // 应用漩涡力
-            function applyVortexForces() {
-                characterGroups.forEach(group => {
-                    group.blocks.forEach(block => {
-                        const dx = vortexCenter.x - block.body.position.x;
-                        const dy = vortexCenter.y - block.body.position.y;
-                        const distance = Math.sqrt(dx * dx + dy * dy);
-                        
-                        if (distance > 0) {
-                            const forceMagnitude = (1 / distance) * vortexStrength * block.body.mass;
-                            const forceX = (dx / distance) * forceMagnitude;
-                            const forceY = (dy / distance) * forceMagnitude;
-                            
-                            const rotationForce = CONFIG.vortex.rotationForce;
-                            const forceAngle = Math.atan2(dy, dx) + Math.PI / 2;
-                            
-                            Body.applyForce(
-                                block.body,
-                                { x: block.body.position.x, y: block.body.position.y },
-                                {
-                                    x: forceX + Math.cos(forceAngle) * rotationForce,
-                                    y: forceY + Math.sin(forceAngle) * rotationForce
-                                }
-                            );
-                        }
-                    });
+                    
+                    // 检查捕获
+                    if (distance < CONFIG.vortex.captureRadius) {
+                        removeGroup(group);
+                        speakText(group.text);
+                    }
                 });
-            }
+            });
+        }
+        
+        // 移除文字组
+        function removeGroup(group) {
+            group.blocks.forEach(block => Matter.World.remove(world, block.body));
+            group.joints.forEach(joint => Matter.World.remove(world, joint));
             
-            // 语音识别功能
-            let recognition;
-            let isListening = false;
-            
-            function initSpeechRecognition() {
+            const index = characterGroups.indexOf(group);
+            if (index > -1) characterGroups.splice(index, 1);
+        }
+        
+        // 清除所有
+        function clearAll() {
+            characterGroups.forEach(removeGroup);
+            showStatus('已清除所有文字');
+        }
+        
+        // 语音相关
+        function setupSpeechRecognition() {
+            if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
                 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-                if (!SpeechRecognition) {
-                    showStatus('您的浏览器不支持语音识别，请使用Chrome浏览器', true);
-                    return null;
-                }
-                
                 recognition = new SpeechRecognition();
                 recognition.continuous = false;
                 recognition.interimResults = false;
                 recognition.lang = 'zh-CN';
                 
                 recognition.onresult = (event) => {
-                    const transcript = event.results[0][0].transcript.trim();
-                    if (transcript) {
-                        launchWord(transcript);
-                        textInput.value = transcript;
-                        showStatus(`语音识别: ${transcript}`);
+                    const text = event.results[0][0].transcript.trim();
+                    if (text) {
+                        launchText(text);
+                        document.getElementById('textInput').value = text;
                     }
                 };
                 
                 recognition.onend = () => {
-                    if (isListening) recognition.start();
-                    else stopListening();
+                    isListening = false;
+                    updateVoiceButton();
                 };
                 
                 recognition.onerror = (event) => {
-                    console.error('语音识别错误:', event.error);
-                    
-                    // 处理不同类型的错误
-                    if (event.error === 'not-allowed' || event.error === 'permission-denied') {
-                        showStatus('麦克风权限被拒绝，请在浏览器设置中允许访问麦克风', true);
-                        // 尝试重新请求权限
-                        requestMicrophonePermission();
-                    } else if (event.error === 'no-speech') {
-                        showStatus('未检测到语音，请再次尝试', true);
-                        if (isListening) recognition.start();
-                    } else {
-                        showStatus(`语音识别错误: ${event.error}`, true);
-                    }
-                    
-                    stopListening();
+                    isListening = false;
+                    updateVoiceButton();
+                    showStatus('语音识别失败', true);
                 };
-                
-                return recognition;
+            }
+        }
+        
+        function toggleVoiceInput() {
+            if (!recognition) {
+                showStatus('浏览器不支持语音识别', true);
+                return;
             }
             
-            function startListening() {
-                if (!recognition) {
-                    recognition = initSpeechRecognition();
-                    if (!recognition) {
-                        showStatus('语音识别初始化失败，正在重新请求权限', true);
-                        requestMicrophonePermission();
-                        return;
-                    }
-                }
-                
-                isListening = true;
-                startVoiceBtn.innerHTML = '<i class="fa fa-stop"></i><span>停止录音</span><span id="voiceDot" class="recording-indicator"></span>';
-                startVoiceBtn.classList.remove('bg-primary', 'hover:bg-primary/90');
-                startVoiceBtn.classList.add('bg-red-500', 'hover:bg-red-600');
-                voiceDot.classList.remove('hidden');
-                
-                try {
-                    recognition.start();
-                    showStatus('正在聆听...');
-                } catch (error) {
-                    console.error('启动语音识别失败:', error);
-                    showStatus('启动语音识别失败，正在重新请求权限', true);
-                    
-                    // 如果启动失败，可能是权限问题，尝试重新请求权限
-                    // 销毁当前实例，重新创建
-                    recognition = null;
-                    requestMicrophonePermission();
-                    stopListening();
-                }
-            }
-            
-            function stopListening() {
+            if (isListening) {
+                recognition.stop();
                 isListening = false;
-                startVoiceBtn.innerHTML = '<i class="fa fa-microphone"></i><span>语音输入</span>';
-                startVoiceBtn.classList.remove('bg-red-500', 'hover:bg-red-600');
-                startVoiceBtn.classList.add('bg-primary', 'hover:bg-primary/90');
-                voiceDot.classList.add('hidden');
-                showStatus('已停止聆听');
+            } else {
+                recognition.start();
+                isListening = true;
             }
             
-            // 语音合成
-            function speakText(text) {
-                if ('speechSynthesis' in window) {
-                    const utterance = new SpeechSynthesisUtterance(text);
-                    utterance.lang = 'zh-CN';
-                    utterance.volume = 1;
-                    utterance.rate = 1;
-                    utterance.pitch = 1;
-                    window.speechSynthesis.speak(utterance);
-                }
+            updateVoiceButton();
+        }
+        
+        function updateVoiceButton() {
+            const btn = document.getElementById('voiceBtn');
+            if (isListening) {
+                btn.classList.add('recording');
+                btn.querySelector('.icon').textContent = '⏹️';
+            } else {
+                btn.classList.remove('recording');
+                btn.querySelector('.icon').textContent = '🎤';
             }
+        }
+        
+        // 开关控制
+        function toggleGravity() {
+            gravityActive = !gravityActive;
+            world.gravity.y = gravityActive ? CONFIG.physics.gravity : 0;
             
-            // 绑定事件
-            function bindEvents() {
-                addTextBtn.addEventListener('click', () => {
-                    buttonClickEffect(addTextBtn);
-                    const text = textInput.value.trim();
-                    if (text) {
-                        launchWord(text);
-                        textInput.value = '';
-                    } else {
-                        textInput.focus();
-                        showStatus('请输入文字内容', true);
-                    }
-                });
-                
-                textInput.addEventListener('keypress', (e) => {
-                    if (e.key === 'Enter') {
-                        const text = textInput.value.trim();
-                        if (text) {
-                            launchWord(text);
-                            textInput.value = '';
-                        }
-                    }
-                });
-                
-                startVoiceBtn.addEventListener('click', () => {
-                    buttonClickEffect(startVoiceBtn);
-                    if (isListening) {
-                        recognition.stop();
-                        stopListening();
-                    } else {
-                        startListening();
-                    }
-                });
-                
-                launchRandomBtn.addEventListener('click', () => {
-                    buttonClickEffect(launchRandomBtn);
-                    const randomWord = randomWords[Math.floor(Math.random() * randomWords.length)];
-                    launchWord(randomWord);
-                    textInput.value = randomWord;
-                });
-                
-                toggleGravityBtn.addEventListener('click', () => {
-                    buttonClickEffect(toggleGravityBtn);
-                    engine.world.gravity.y = engine.world.gravity.y === 0 ? 0.8 : 0;
-                    const status = engine.world.gravity.y === 0 ? '关' : '开';
-                    toggleGravityBtn.innerHTML = `<i class="fa fa-moon-o"></i><span>重力: ${status}</span>`;
-                    showStatus(`重力已${status}`);
-                });
-                
-                toggleVortexBtn.addEventListener('click', () => {
-                    buttonClickEffect(toggleVortexBtn);
-                    vortexActive = !vortexActive;
-                    const status = vortexActive ? '开' : '关';
-                    toggleVortexBtn.innerHTML = `<i class="fa fa-sync"></i><span>漩涡: ${status}</span>`;
-                    
-                    if (vortexActive) {
-                        vortexVisual.classList.add('animate-spin');
-                        vortexVisual.style.boxShadow = '0 0 40px rgba(139, 92, 246, 0.8), 0 0 80px rgba(139, 92, 246, 0.5), 0 0 120px rgba(139, 92, 246, 0.3)';
-                    } else {
-                        vortexVisual.classList.remove('animate-spin');
-                        vortexVisual.style.boxShadow = '0 0 20px rgba(139, 92, 246, 0.4)';
-                    }
-                    
-                    showStatus(`漩涡已${status}`);
-                });
-                
-                clearAllBtn.addEventListener('click', () => {
-                    buttonClickEffect(clearAllBtn);
-                    characterGroups.forEach(group => {
-                        group.blocks.forEach(block => World.remove(engine.world, block.body));
-                        group.joints.forEach(joint => World.remove(engine.world, joint));
-                    });
-                    
-                    characterGroups = [];
-                    window.speechSynthesis.cancel();
-                    showStatus('已清除所有文字');
-                });
-                
-
-                
-                showStatus('系统已就绪，可开始使用');
+            const switchEl = document.getElementById('gravitySwitch');
+            switchEl.classList.toggle('active', gravityActive);
+            
+            showStatus(gravityActive ? '重力已开启' : '重力已关闭');
+        }
+        
+        function toggleVortex() {
+            vortexActive = !vortexActive;
+            
+            const switchEl = document.getElementById('vortexSwitch');
+            const vortexVisual = document.getElementById('vortexVisual');
+            
+            switchEl.classList.toggle('active', vortexActive);
+            vortexVisual.style.display = vortexActive ? 'flex' : 'none';
+            
+            showStatus(vortexActive ? '漩涡已开启' : '漩涡已关闭');
+        }
+        
+        // 语音合成
+        function speakText(text) {
+            if ('speechSynthesis' in window) {
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'zh-CN';
+                utterance.rate = 0.9;
+                speechSynthesis.speak(utterance);
             }
+        }
+        
+        // 显示状态
+        function showStatus(message, isError = false) {
+            const statusEl = document.getElementById('statusMessage');
+            statusEl.textContent = message;
+            statusEl.style.backgroundColor = isError ? 'rgba(239, 68, 68, 0.9)' : 'rgba(0, 0, 0, 0.8)';
+            statusEl.classList.add('show');
             
-            // 绘制每个方块及其文字（完全填充）
-            function drawCharacterBlocks(group) {
-                group.blocks.forEach(block => {
-                    const body = block.body;
-                    
-                    ctx.save();
-                    // 平移到方块位置
-                    ctx.translate(body.position.x, body.position.y);
-                    // 旋转以匹配方块角度
-                    ctx.rotate(body.angle);
-                    
-                    // 绘制方块（如果显示方块）
-                    const size = 40;
-                    if (showBlocks) {
-                        ctx.beginPath();
-                        ctx.fillStyle = block.color.bg;
-                        ctx.strokeStyle = block.color.border;
-                        ctx.lineWidth = 2;
-                        
-                        // 绘制圆角矩形
-                        const radius = 6;
-                        const x = -size / 2;
-                        const y = -size / 2;
-                        
-                        ctx.moveTo(x + radius, y);
-                        ctx.arcTo(x + size, y, x + size, y + size, radius);
-                        ctx.arcTo(x + size, y + size, x, y + size, radius);
-                        ctx.arcTo(x, y + size, x, y, radius);
-                        ctx.arcTo(x, y, x + size, y, radius);
-                        ctx.closePath();
-                        
-                        ctx.fill();
-                        ctx.stroke();
-                    }
-                    
-                    // 在方块中心绘制文字（完全填充，无边界）
-                    // 根据方块显示状态调整文字颜色
-                    const textColor = showBlocks ? block.color.text : block.color.border;
-                    
-                    // 设置阴影效果
-                    ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-                    ctx.shadowBlur = 4;
-                    ctx.shadowOffsetX = 2;
-                    ctx.shadowOffsetY = 2;
-                    
-                    // 使用计算好的字体大小
-                    ctx.font = `bold ${block.fontSize}px Inter, system-ui, sans-serif`;
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'middle';
-                    
-                    // 绘制文字描边增强立体感
-                    ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
-                    ctx.lineWidth = 2;
-                    ctx.lineJoin = 'round';
-                    ctx.strokeText(block.char, 0, 1);
-                    
-                    // 绘制文字主体
-                    ctx.fillStyle = textColor;
-                    ctx.fillText(block.char, 0, 1);
-                    
-                    // 添加立体效果的亮边
-                    ctx.shadowColor = 'rgba(255, 255, 255, 0.5)';
-                    ctx.shadowBlur = 2;
-                    ctx.shadowOffsetX = -1;
-                    ctx.shadowOffsetY = -1;
-                    ctx.fillText(block.char, 0, 1);
-                    
-                    // 重置阴影设置
-                    ctx.shadowColor = 'transparent';
-                    ctx.shadowBlur = 0;
-                    ctx.shadowOffsetX = 0;
-                    ctx.shadowOffsetY = 0;
-                    
-                    ctx.restore();
-                });
-            }
-            
-            // 更新循环
+            setTimeout(() => {
+                statusEl.classList.remove('show');
+            }, 2000);
+        }
+        
+        // 游戏循环
+        function startGameLoop() {
             function update() {
-                requestAnimationFrame(update);
+                applyVortexForces();
+                Matter.Engine.update(engine);
                 
-                // 应用漩涡力
-                if (vortexActive && characterGroups.length > 0) {
-                    applyVortexForces();
-                    checkVortexCapture();
-                }
+                const container = canvas.parentElement;
+                const rect = container.getBoundingClientRect();
                 
-                // 更新引擎
-                Engine.update(engine);
+                ctx.clearRect(0, 0, rect.width, rect.height);
                 
-                // 清除画布
-                ctx.fillStyle = '#ffffff';
-                ctx.fillRect(0, 0, canvas.width / (window.devicePixelRatio || 1), 600);
-                
-                // 绘制所有文字方块组
                 characterGroups.forEach(group => {
-                    drawCharacterBlocks(group);
+                    group.blocks.forEach(block => {
+                        const { body, char, color, fontSize } = block;
+                        
+                        ctx.save();
+                        ctx.translate(body.position.x, body.position.y);
+                        ctx.rotate(body.angle);
+                        
+                        // 绘制文字
+                        ctx.font = `bold ${fontSize}px system-ui`;
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        
+                        // 阴影效果
+                        ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+                        ctx.shadowBlur = 4;
+                        ctx.shadowOffsetX = 2;
+                        ctx.shadowOffsetY = 2;
+                        
+                        ctx.fillStyle = color.border;
+                        ctx.fillText(char, 0, 1);
+                        
+                        ctx.shadowColor = 'transparent';
+                        ctx.fillStyle = color.text;
+                        ctx.fillText(char, 0, 0);
+                        
+                        ctx.restore();
+                    });
                 });
-            }
-            
-            // 初始化
-            function init() {
-                // 设置Canvas渲染属性
-                ctx.imageSmoothingEnabled = true;
-                ctx.imageSmoothingQuality = 'high';
                 
-                // 自动请求麦克风权限
-                requestMicrophonePermission();
-                
-                bindEvents();
-                update();
-                textInput.focus();
+                requestAnimationFrame(update);
             }
             
-            // 请求麦克风权限
-            function requestMicrophonePermission() {
-                if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-                    navigator.mediaDevices.getUserMedia({ audio: true })
-                        .then(stream => {
-                            // 获取权限成功，立即停止使用麦克风
-                            stream.getTracks().forEach(track => track.stop());
-                            showStatus('麦克风权限已获取');
-                            
-                            // 权限获取成功后，初始化语音识别
-                            if (!recognition) {
-                                recognition = initSpeechRecognition();
-                            }
-                        })
-                        .catch(err => {
-                            console.error('麦克风权限获取失败:', err);
-                            showStatus('麦克风权限获取失败，请手动授权', true);
-                            
-                            // 3秒后自动重试
-                            setTimeout(() => {
-                                showStatus('正在重新请求麦克风权限...');
-                                requestMicrophonePermission();
-                            }, 3000);
-                        });
-                } else {
-                    console.error('浏览器不支持麦克风访问');
-                    showStatus('浏览器不支持麦克风访问', true);
-                }
-            }
-            
-            init();
-        };
+            update();
+        }
+        
+        // 启动应用
+        init();
     </script>
 </body>
 </html>
