@@ -1,0 +1,1149 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文字顶满方块的物理系统</title>
+    <script src="matter.min.js"></script>
+    
+    <style>
+        /* 基础样式 */
+        :root {
+            --primary: #3B82F6;
+            --secondary: #10B981;
+            --accent: #EC4899;
+            --dark: #1E293B;
+            --vortex: #8B5CF6;
+            --gray-50: #F9FAFB;
+            --gray-100: #F3F4F6;
+            --gray-300: #D1D5DB;
+            --gray-600: #4B5563;
+            --gray-700: #374151;
+            --red-500: #EF4444;
+            --red-600: #DC2626;
+            --blue-50: #EFF6FF;
+            --blue-700: #1D4ED8;
+        }
+        
+        /* 通用样式 */
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background-color: var(--gray-50);
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1024px;
+            margin: 0 auto;
+            padding: 1.5rem 1rem;
+        }
+        
+        /* 布局样式 */
+        .mx-auto { margin-left: auto; margin-right: auto; }
+        .px-4 { padding-left: 1rem; padding-right: 1rem; }
+        .py-6 { padding-top: 1.5rem; padding-bottom: 1.5rem; }
+        .max-w-5xl { max-width: 64rem; }
+        .mb-6 { margin-bottom: 1.5rem; }
+        .mb-2 { margin-bottom: 0.5rem; }
+        .mb-1\.5 { margin-bottom: 0.375rem; }
+        .mt-4 { margin-top: 1rem; }
+        .p-5 { padding: 1.25rem; }
+        .p-3 { padding: 0.75rem; }
+        .px-5 { padding-left: 1.25rem; padding-right: 1.25rem; }
+        .py-2\.5 { padding-top: 0.625rem; padding-bottom: 0.625rem; }
+        .px-3 { padding-left: 0.75rem; padding-right: 0.75rem; }
+        .py-2 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+        .px-4 { padding-left: 1rem; padding-right: 1rem; }
+        .ml-2 { margin-left: 0.5rem; }
+        .mr-2 { margin-right: 0.5rem; }
+        .gap-2 { gap: 0.5rem; }
+        .gap-3 { gap: 0.75rem; }
+        .gap-4 { gap: 1rem; }
+        
+        /* 文本样式 */
+        .text-center { text-align: center; }
+        .text-lg { font-size: 1.125rem; }
+        .text-sm { font-size: 0.875rem; }
+        .text-2xl { font-size: 1.5rem; }
+        .font-bold { font-weight: 700; }
+        .font-medium { font-weight: 500; }
+        .text-white { color: white; }
+        .text-dark { color: var(--dark); }
+        .text-gray-600 { color: var(--gray-600); }
+        .text-gray-700 { color: var(--gray-700); }
+        .text-blue-700 { color: var(--blue-700); }
+        
+        h1 {
+            font-size: clamp(1.7rem, 4vw, 2.3rem);
+            margin: 0 0 0.5rem 0;
+        }
+        
+        /* 组件样式 */
+        .bg-white { background-color: white; }
+        .bg-primary { background-color: var(--primary); }
+        .bg-secondary { background-color: var(--secondary); }
+        .bg-accent { background-color: var(--accent); }
+        .bg-gray-600 { background-color: var(--gray-600); }
+        .bg-vortex { background-color: var(--vortex); }
+        .bg-red-500 { background-color: var(--red-500); }
+        .bg-blue-50 { background-color: var(--blue-50); }
+        
+        .hover\:bg-primary\/90:hover { background-color: rgba(59, 130, 246, 0.9); }
+        .hover\:bg-secondary\/90:hover { background-color: rgba(16, 185, 129, 0.9); }
+        .hover\:bg-accent\/90:hover { background-color: rgba(236, 72, 153, 0.9); }
+        .hover\:bg-gray-700:hover { background-color: var(--gray-700); }
+        .hover\:bg-vortex\/90:hover { background-color: rgba(139, 92, 246, 0.9); }
+        .hover\:bg-red-600:hover { background-color: var(--red-600); }
+        
+        .rounded-xl { border-radius: 0.75rem; }
+        .rounded-lg { border-radius: 0.5rem; }
+        .rounded-l-lg { border-top-left-radius: 0.5rem; border-bottom-left-radius: 0.5rem; }
+        .rounded-r-lg { border-top-right-radius: 0.5rem; border-bottom-right-radius: 0.5rem; }
+        .rounded-full { border-radius: 9999px; }
+        
+        .shadow-md { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); }
+        .shadow-lg { box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); }
+        
+        .border { border-width: 1px; }
+        .border-gray-300 { border-color: var(--gray-300); }
+        
+        /* 布局组件 */
+        .flex { display: flex; }
+        .flex-1 { flex: 1 1 0%; }
+        .flex-col { flex-direction: column; }
+        .flex-wrap { flex-wrap: wrap; }
+        .items-center { align-items: center; }
+        .justify-center { justify-content: center; }
+        .min-w-\[200px\] { min-width: 200px; }
+        .w-full { width: 100%; }
+        .w-3 { width: 0.75rem; }
+        .h-3 { height: 0.75rem; }
+        .w-16 { width: 4rem; }
+        .h-16 { height: 4rem; }
+        .w-12 { width: 3rem; }
+        .h-12 { height: 3rem; }
+        .inline-block { display: inline-block; }
+        .hidden { display: none; }
+        .relative { position: relative; }
+        .absolute { position: absolute; }
+        .overflow-hidden { overflow: hidden; }
+        
+        .grid { display: grid; }
+        .grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+        
+        /* 表单元素 */
+        input[type="text"] {
+            width: 100%;
+            padding: 0.625rem 1rem;
+            border: 1px solid var(--gray-300);
+            border-radius: 0.5rem 0 0 0.5rem;
+            outline: none;
+        }
+        
+        input[type="text"]:focus {
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
+        }
+        
+        button {
+            cursor: pointer;
+            border: none;
+            font-family: inherit;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            transition: all 0.3s ease;
+        }
+        
+        /* 动画 */
+        .vortex-core {
+            position: absolute;
+            border-radius: 9999px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            box-shadow: 0 0 40px rgba(139, 92, 246, 0.8), 
+                        0 0 80px rgba(139, 92, 246, 0.5),
+                        0 0 120px rgba(139, 92, 246, 0.3);
+            animation: vortex-pulse 3s infinite;
+        }
+        
+        @keyframes vortex-pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        
+        .launcher {
+            position: absolute;
+            background-color: var(--primary);
+            border-radius: 9999px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        
+        .btn-active {
+            transform: scale(0.95);
+        }
+        
+        .launch-animation {
+            animation: launch-pulse 0.5s ease-out;
+        }
+        
+        @keyframes launch-pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); }
+        }
+        
+        .recording-indicator {
+            display: inline-block;
+            width: 0.75rem;
+            height: 0.75rem;
+            background-color: var(--red-500);
+            border-radius: 9999px;
+            margin-left: 0.5rem;
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .animate-spin {
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        
+        /* 响应式布局 */
+        @media (min-width: 640px) {
+            .sm\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+        
+        @media (min-width: 768px) {
+            .md\:flex-row { flex-direction: row; }
+            .md\:grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+        }
+        
+        /* 图标样式 */
+        .fa {
+            display: inline-block;
+            font: normal normal normal 14px/1 FontAwesome;
+            font-size: inherit;
+            text-rendering: auto;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        
+        .fa-microphone:before { content: "🎤"; }
+        .fa-paper-plane:before { content: "📤"; }
+        .fa-random:before { content: "🔀"; }
+        .fa-moon-o:before { content: "🌙"; }
+        .fa-sync:before { content: "🔄"; }
+        .fa-trash:before { content: "🗑️"; }
+        .fa-rocket:before { content: "🚀"; }
+        .fa-info-circle:before { content: "ℹ️"; }
+    </style>
+</head>
+<body class="bg-gray-50 font-inter min-h-screen">
+    <div class="container mx-auto px-4 py-6 max-w-5xl">
+        <header class="text-center mb-6">
+            <h1 class="text-[clamp(1.7rem,4vw,2.3rem)] font-bold text-dark mb-2">文字顶满方块的物理系统</h1>
+            <p class="text-gray-600 text-lg">文字完全填充方块，不留边距</p>
+        </header>
+
+        <!-- 控制区域 -->
+        <div class="bg-white rounded-xl shadow-md p-5 mb-6">
+            <div class="flex flex-col md:flex-row gap-4 items-center">
+                <div class="flex-1 w-full">
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">输入方式</label>
+                    <div class="flex flex-wrap gap-3">
+                        <button id="startVoice" class="bg-primary hover:bg-primary/90 text-white px-5 py-2.5 rounded-lg transition-all duration-300 flex items-center gap-2">
+                            <i class="fa fa-microphone"></i>
+                            <span>语音输入</span>
+                            <span id="voiceDot" class="recording-indicator hidden"></span>
+                        </button>
+                        
+                        <div class="flex-1 min-w-[200px]">
+                            <div class="flex">
+                                <input type="text" id="textInput" 
+                                    class="flex-1 px-4 py-2.5 border border-gray-300 rounded-l-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                                    placeholder="输入文字...">
+                                <button id="addText" class="bg-secondary hover:bg-secondary/90 text-white px-4 py-2.5 rounded-r-lg transition-colors duration-300">
+                                    <i class="fa fa-paper-plane"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                <button id="launchRandom" class="bg-accent hover:bg-accent/90 text-white px-3 py-2 rounded-lg transition-colors duration-300 flex items-center justify-center gap-2">
+                    <i class="fa fa-random"></i>
+                    <span>随机发射</span>
+                </button>
+                
+                <button id="toggleGravity" class="bg-gray-600 hover:bg-gray-700 text-white px-3 py-2 rounded-lg transition-colors duration-300 flex items-center justify-center gap-2">
+                    <i class="fa fa-moon-o"></i>
+                    <span>重力: 开</span>
+                </button>
+                
+                <button id="toggleVortex" class="bg-vortex hover:bg-vortex/90 text-white px-3 py-2 rounded-lg transition-colors duration-300 flex items-center justify-center gap-2">
+                    <i class="fa fa-sync"></i>
+                    <span>漩涡: 开</span>
+                </button>
+                
+                <button id="clearAll" class="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg transition-colors duration-300 flex items-center justify-center gap-2">
+                    <i class="fa fa-trash"></i>
+                    <span>清除所有</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- 物理模拟区域 -->
+        <div class="relative bg-white rounded-xl shadow-lg overflow-hidden">
+            <canvas id="physicsCanvas" class="w-full" height="600"></canvas>
+            
+            <!-- 漩涡核心（视觉效果） -->
+            <div id="vortexVisual" class="vortex-core w-16 h-16 bg-vortex/80">
+                <i class="fa fa-sync text-2xl animate-spin"></i>
+            </div>
+            
+            <!-- 发射器（视觉效果）- 位置上移 -->
+            <div id="launcherVisual" class="launcher w-12 h-12">
+                <i class="fa fa-rocket"></i>
+            </div>
+        </div>
+
+        <!-- 状态提示区域 -->
+        <div id="statusMessage" class="mt-4 p-3 rounded-lg bg-blue-50 text-blue-700 hidden">
+            <i class="fa fa-info-circle mr-2"></i>
+            <span id="statusText">系统就绪</span>
+        </div>
+
+    </div>
+
+    <script>
+        window.onload = function() {
+            // DOM元素引用
+            const canvas = document.getElementById('physicsCanvas');
+            const ctx = canvas.getContext('2d');
+            const textInput = document.getElementById('textInput');
+            const addTextBtn = document.getElementById('addText');
+            const startVoiceBtn = document.getElementById('startVoice');
+            const voiceDot = document.getElementById('voiceDot');
+            const launchRandomBtn = document.getElementById('launchRandom');
+            const toggleGravityBtn = document.getElementById('toggleGravity');
+            const toggleVortexBtn = document.getElementById('toggleVortex');
+
+            const clearAllBtn = document.getElementById('clearAll');
+            const vortexVisual = document.getElementById('vortexVisual');
+            const launcherVisual = document.getElementById('launcherVisual');
+            const statusMessage = document.getElementById('statusMessage');
+            const statusText = document.getElementById('statusText');
+            
+            // ===== 系统可调参数配置 =====
+            const CONFIG = {
+                // 物理参数
+                physics: {
+                    gravity: 0.8,           // 重力大小
+                    timeScale: 1,           // 时间缩放
+                    fps: 60                 // 帧率
+                },
+                // 漩涡参数
+                vortex: {
+                    strength: 0.005,        // 漩涡力度
+                    captureRadius: 50,      // 捕获半径
+                    rotationForce: 0.0005,  // 旋转力
+                    xPosition: 0.75         // 水平位置(0-1)
+                },
+                // 方块参数
+                block: {
+                    size: 40,               // 方块大小
+                    gap: 5,                 // 方块间隙
+                    restitution: 0.6,       // 弹性
+                    friction: 0.1,          // 摩擦力
+                    frictionAir: 0.03,      // 空气阻力
+                    density: 0.04,          // 密度
+                    showBlocks: false       // 是否显示方块背景
+                },
+                // 发射参数
+                launcher: {
+                    x: 100,                 // 发射器X位置
+                    y: 150,                 // 发射器Y位置
+                    baseForce: 12,          // 基础发射力
+                    forceVariation: 10,      // 力度变化范围
+                    angleRange: 60          // 角度范围(±30度)
+                },
+                // 关节参数
+                joint: {
+                    stiffness: 0.1,         // 刚度
+                    damping: 0.1            // 阻尼
+                },
+                // 语音参数
+                speech: {
+                    lang: 'zh-CN',          // 语言
+                    volume: 1,              // 音量
+                    rate: 1,                // 语速
+                    pitch: 1                // 音调
+                }
+            };
+            
+            // 方块显示状态 - 使用配置参数
+            let showBlocks = CONFIG.block.showBlocks;
+            
+            // 显示状态消息的函数
+            function showStatus(message, isError = false) {
+                statusText.textContent = message;
+                statusMessage.classList.remove('hidden', 'bg-blue-50', 'text-blue-700', 'bg-red-50', 'text-red-700');
+                
+                if (isError) {
+                    statusMessage.classList.add('bg-red-50', 'text-red-700');
+                } else {
+                    statusMessage.classList.add('bg-blue-50', 'text-blue-700');
+                }
+                
+                setTimeout(() => {
+                    statusMessage.classList.add('hidden');
+                }, 3000);
+            }
+            
+            // 物理引擎初始化
+            const { Engine, World, Bodies, Body, Constraint, Mouse, MouseConstraint } = Matter;
+            
+            // 创建引擎 - 使用配置参数
+            const engine = Engine.create({
+                timing: {
+                    timeScale: CONFIG.physics.timeScale,
+                    delta: 1000 / CONFIG.physics.fps // 根据fps计算delta
+                }
+            });
+            engine.world.gravity.y = CONFIG.physics.gravity;
+            
+            // 初始化Canvas尺寸，考虑设备像素比
+            function initialResizeCanvas() {
+                const container = canvas.parentElement;
+                const dpr = window.devicePixelRatio || 1;
+                const rect = container.getBoundingClientRect();
+                
+                canvas.width = rect.width * dpr;
+                canvas.height = 600 * dpr;
+                canvas.style.width = `${rect.width}px`;
+                canvas.style.height = '600px';
+                
+                // 调整上下文缩放
+                ctx.scale(dpr, dpr);
+                
+                // 定位视觉元素 - 漩涡位置与物理位置一致
+                vortexVisual.style.left = `${rect.width * CONFIG.vortex.xPosition - 32}px`;
+                vortexVisual.style.top = `300px`;
+                
+                // 发射器位置上移
+                launcherVisual.style.left = '30px';
+                launcherVisual.style.top = `150px`;
+            }
+            
+            initialResizeCanvas();
+            
+            // 创建世界边界
+            const ground = Bodies.rectangle(canvas.width / (2 * window.devicePixelRatio || 1), 
+                                           600 - 10, 
+                                           canvas.width / (window.devicePixelRatio || 1), 
+                                           20, 
+                                           { isStatic: true });
+            const ceiling = Bodies.rectangle(canvas.width / (2 * window.devicePixelRatio || 1), 
+                                            10, 
+                                            canvas.width / (window.devicePixelRatio || 1), 
+                                            20, 
+                                            { isStatic: true });
+            const leftWall = Bodies.rectangle(10, 
+                                             300, 
+                                             20, 
+                                             600, 
+                                             { isStatic: true });
+            const rightWall = Bodies.rectangle(canvas.width / (window.devicePixelRatio || 1) - 10, 
+                                              300, 
+                                              20, 
+                                              600, 
+                                              { isStatic: true });
+            
+            // 漩涡设置 - 使用配置参数
+            const vortexCenter = { 
+                x: canvas.parentElement.getBoundingClientRect().width * CONFIG.vortex.xPosition,
+                y: 300 
+            };
+            const vortexStrength = CONFIG.vortex.strength;
+            let vortexActive = true;
+            
+            // 发射器位置 - 使用配置参数
+            const launcherPosition = { 
+                x: CONFIG.launcher.x, 
+                y: CONFIG.launcher.y 
+            };
+            
+            // 存储文字方块组
+            let characterGroups = [];
+            
+            // 颜色库
+            const colors = [
+                { bg: 'rgba(59, 130, 246, 0.95)', text: 'white', border: 'rgba(59, 130, 246, 1)' },
+                { bg: 'rgba(16, 185, 129, 0.95)', text: 'white', border: 'rgba(16, 185, 129, 1)' },
+                { bg: 'rgba(236, 72, 153, 0.95)', text: 'white', border: 'rgba(236, 72, 153, 1)' },
+                { bg: 'rgba(245, 158, 11, 0.95)', text: 'white', border: 'rgba(245, 158, 11, 1)' },
+                { bg: 'rgba(239, 68, 68, 0.95)', text: 'white', border: 'rgba(239, 68, 68, 1)' },
+                { bg: 'rgba(139, 92, 246, 0.95)', text: 'white', border: 'rgba(139, 92, 246, 1)' }
+            ];
+            
+            // 随机词语库
+            const randomWords = [
+                '天', '地', '日', '月', '山', '水', '风', '云',
+                '春', '夏', '秋', '冬', '花', '鸟', '树', '木'
+            ];
+            
+            // 添加边界到世界
+            World.add(engine.world, [ground, ceiling, leftWall, rightWall]);
+            
+            // 鼠标交互
+            const mouse = Mouse.create(canvas);
+            const mouseConstraint = MouseConstraint.create(engine, {
+                mouse: mouse,
+                constraint: {
+                    stiffness: 0.2,
+                    render: { visible: false }
+                }
+            });
+            
+            World.add(engine.world, mouseConstraint);
+            
+            // 调整尺寸函数
+            function resizeCanvas() {
+                const container = canvas.parentElement;
+                const dpr = window.devicePixelRatio || 1;
+                const rect = container.getBoundingClientRect();
+                
+                // 保存当前鼠标比例
+                mouse.pixelRatio = dpr;
+                
+                // 调整Canvas尺寸
+                canvas.width = rect.width * dpr;
+                canvas.height = 600 * dpr;
+                canvas.style.width = `${rect.width}px`;
+                canvas.style.height = '600px';
+                
+                // 重置上下文缩放
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+                ctx.scale(dpr, dpr);
+                
+                // 更新视觉元素位置 - 与物理位置一致
+                vortexVisual.style.left = `${rect.width * CONFIG.vortex.xPosition - 32}px`;
+                
+                // 发射器保持位置
+                launcherVisual.style.left = '30px';
+                launcherVisual.style.top = '150px';
+                
+                // 更新世界边界
+                Matter.Body.setPosition(ground, { x: rect.width / 2, y: 600 - 10 });
+                Matter.Body.setSize(ground, { width: rect.width, height: 20 });
+                
+                Matter.Body.setPosition(ceiling, { x: rect.width / 2, y: 10 });
+                Matter.Body.setSize(ceiling, { width: rect.width, height: 20 });
+                
+                Matter.Body.setPosition(leftWall, { x: 10, y: 300 });
+                Matter.Body.setSize(leftWall, { width: 20, height: 600 });
+                
+                Matter.Body.setPosition(rightWall, { x: rect.width - 10, y: 300 });
+                Matter.Body.setSize(rightWall, { width: 20, height: 600 });
+                
+                // 更新漩涡中心 - 向右偏移到75%位置
+                vortexCenter.x = rect.width * CONFIG.vortex.xPosition;
+                vortexCenter.y = 300;
+                
+                // 更新发射器物理位置
+                launcherPosition.x = 50;
+                launcherPosition.y = 150;
+            }
+            
+            window.addEventListener('resize', resizeCanvas);
+            
+            // 发射动画
+            function triggerLaunchAnimation() {
+                launcherVisual.classList.add('launch-animation');
+                setTimeout(() => {
+                    launcherVisual.classList.remove('launch-animation');
+                }, 500);
+            }
+            
+            // 按钮点击效果
+            function buttonClickEffect(button) {
+                button.classList.add('btn-active');
+                setTimeout(() => {
+                    button.classList.remove('btn-active');
+                }, 200);
+            }
+            
+            // 计算最佳字体大小以完全填充方块（无边界）
+            function calculateFontSize(char, blockSize) {
+                // 创建一个临时画布用于测量文本
+                const tempCanvas = document.createElement('canvas');
+                const tempCtx = tempCanvas.getContext('2d');
+                
+                // 可用于测量的最大尺寸（完全填充方块）
+                const maxWidth = blockSize;
+                const maxHeight = blockSize;
+                
+                // 二分法查找最佳字体大小
+                let low = 8;
+                let high = blockSize * 2; // 最大可能尺寸为方块的2倍
+                let bestSize = 8;
+                
+                while (high - low > 1) {
+                    const mid = Math.floor((low + high) / 2);
+                    tempCtx.font = `bold ${mid}px Inter, system-ui, sans-serif`;
+                    const metrics = tempCtx.measureText(char);
+                    
+                    // 获取文本实际高度
+                    const textHeight = mid * 1.1; // 调整因子以更精确匹配实际高度
+                    
+                    // 文字必须完全在方块内，不留边距
+                    if (metrics.width <= maxWidth && textHeight <= maxHeight) {
+                        bestSize = mid;
+                        low = mid;
+                    } else {
+                        high = mid;
+                    }
+                }
+                
+                return bestSize;
+            }
+            
+            // 创建文字方块组（每个方块一个文字）
+            function createCharacterBlocks(text, x, y) {
+                // 分割文字为单个字符
+                const characters = text.split('');
+                if (characters.length === 0) return null;
+                
+                // 方块参数 - 使用配置参数
+                const blockSize = CONFIG.block.size;
+                const gap = CONFIG.block.gap; // 方块之间的间隙
+                
+                // 整个组的总宽度
+                const totalWidth = characters.length * blockSize + (characters.length - 1) * gap;
+                
+                // 防止长文字卡墙 - 计算安全的发射位置
+                const minSafeX = 30 + totalWidth / 2; // 左边界安全距离
+                const maxSafeX = canvas.width / (window.devicePixelRatio || 1) - 30 - totalWidth / 2; // 右边界安全距离
+                
+                // 调整发射位置，确保不会卡墙
+                const safeX = Math.max(minSafeX, Math.min(x, maxSafeX));
+                
+                // 为整个组选择一个颜色主题
+                const color = colors[Math.floor(Math.random() * colors.length)];
+                
+                // 存储方块和关节
+                const blocks = [];
+                const joints = [];
+                
+                // 创建每个字符的方块
+                characters.forEach((char, index) => {
+                    // 计算每个方块的初始位置 - 使用安全的X坐标
+                    const blockX = safeX - totalWidth / 2 + index * (blockSize + gap) + blockSize / 2;
+                    
+                    const block = Bodies.rectangle(
+                        blockX, 
+                        y, 
+                        blockSize, 
+                        blockSize, 
+                        { 
+                            restitution: CONFIG.block.restitution,
+                            friction: CONFIG.block.friction,
+                            frictionAir: CONFIG.block.frictionAir,
+                            density: CONFIG.block.density
+                        }
+                    );
+                    
+                    // 计算适合当前字符的字体大小（完全填充方块）
+                    const fontSize = calculateFontSize(char, blockSize);
+                    
+                    // 存储方块信息
+                    blocks.push({
+                        body: block,
+                        char: char,
+                        color: color,
+                        fontSize: fontSize
+                    });
+                    
+                    World.add(engine.world, block);
+                });
+                
+                // 创建连接方块的柔性关节
+                for (let i = 0; i < blocks.length - 1; i++) {
+                    const joint = Constraint.create({
+                        bodyA: blocks[i].body,
+                        bodyB: blocks[i + 1].body,
+                        pointA: { x: blockSize / 2 + gap / 2, y: 0 },
+                        pointB: { x: -blockSize / 2 - gap / 2, y: 0 },
+                        length: 0,
+                        stiffness: CONFIG.joint.stiffness,
+                        damping: CONFIG.joint.damping
+                    });
+                    
+                    joints.push(joint);
+                    World.add(engine.world, joint);
+                }
+                
+                // 返回完整的文字方块组
+                return {
+                    blocks,
+                    joints,
+                    fullText: text
+                };
+            }
+            
+            // 发射文字方块组
+            function launchWord(text) {
+                if (!text || text.trim() === '') {
+                    showStatus('请输入文字后再发射', true);
+                    return null;
+                }
+                
+                triggerLaunchAnimation();
+                const characterGroup = createCharacterBlocks(text, launcherPosition.x, launcherPosition.y);
+                if (!characterGroup) return null;
+                
+                // 随机发射角度和力度 - 使用配置参数
+                const angle = (Math.random() * CONFIG.launcher.angleRange - CONFIG.launcher.angleRange/2) * Math.PI / 180;
+                const baseForce = CONFIG.launcher.baseForce + Math.random() * CONFIG.launcher.forceVariation;
+                
+                // 对每个方块应用发射力
+                characterGroup.blocks.forEach((block, index) => {
+                    const forceVariation = 1 + (index - (characterGroup.blocks.length - 1) / 2) * 0.1;
+                    const force = baseForce * forceVariation;
+                    
+                    Body.setVelocity(block.body, {
+                        x: Math.cos(angle) * force,
+                        y: Math.sin(angle) * force
+                    });
+                });
+                
+                // 存储文字方块组
+                characterGroups.push(characterGroup);
+                showStatus(`已发射: ${text}`);
+                return characterGroup;
+            }
+            
+            // 检查漩涡捕获
+            function checkVortexCapture() {
+                for (let i = characterGroups.length - 1; i >= 0; i--) {
+                    const group = characterGroups[i];
+                    let isCaptured = false;
+                    
+                    // 检查任何一个方块是否进入漩涡范围
+                    for (const block of group.blocks) {
+                        const dx = vortexCenter.x - block.body.position.x;
+                        const dy = vortexCenter.y - block.body.position.y;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+                        
+                        if (distance < CONFIG.vortex.captureRadius) {
+                            isCaptured = true;
+                            break;
+                        }
+                    }
+                    
+                    // 如果被吸入，移除整个组
+                    if (isCaptured) {
+                        // 移除所有方块
+                        group.blocks.forEach(block => {
+                            World.remove(engine.world, block.body);
+                        });
+                        
+                        // 移除所有关节
+                        group.joints.forEach(joint => {
+                            World.remove(engine.world, joint);
+                        });
+                        
+                        // 朗读完整文字
+                        speakText(group.fullText);
+                        
+                        // 从数组中移除
+                        characterGroups.splice(i, 1);
+                    }
+                }
+            }
+            
+            // 应用漩涡力
+            function applyVortexForces() {
+                characterGroups.forEach(group => {
+                    group.blocks.forEach(block => {
+                        const dx = vortexCenter.x - block.body.position.x;
+                        const dy = vortexCenter.y - block.body.position.y;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+                        
+                        if (distance > 0) {
+                            const forceMagnitude = (1 / distance) * vortexStrength * block.body.mass;
+                            const forceX = (dx / distance) * forceMagnitude;
+                            const forceY = (dy / distance) * forceMagnitude;
+                            
+                            const rotationForce = CONFIG.vortex.rotationForce;
+                            const forceAngle = Math.atan2(dy, dx) + Math.PI / 2;
+                            
+                            Body.applyForce(
+                                block.body,
+                                { x: block.body.position.x, y: block.body.position.y },
+                                {
+                                    x: forceX + Math.cos(forceAngle) * rotationForce,
+                                    y: forceY + Math.sin(forceAngle) * rotationForce
+                                }
+                            );
+                        }
+                    });
+                });
+            }
+            
+            // 语音识别功能
+            let recognition;
+            let isListening = false;
+            
+            function initSpeechRecognition() {
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                if (!SpeechRecognition) {
+                    showStatus('您的浏览器不支持语音识别，请使用Chrome浏览器', true);
+                    return null;
+                }
+                
+                recognition = new SpeechRecognition();
+                recognition.continuous = false;
+                recognition.interimResults = false;
+                recognition.lang = 'zh-CN';
+                
+                recognition.onresult = (event) => {
+                    const transcript = event.results[0][0].transcript.trim();
+                    if (transcript) {
+                        launchWord(transcript);
+                        textInput.value = transcript;
+                        showStatus(`语音识别: ${transcript}`);
+                    }
+                };
+                
+                recognition.onend = () => {
+                    if (isListening) recognition.start();
+                    else stopListening();
+                };
+                
+                recognition.onerror = (event) => {
+                    console.error('语音识别错误:', event.error);
+                    
+                    // 处理不同类型的错误
+                    if (event.error === 'not-allowed' || event.error === 'permission-denied') {
+                        showStatus('麦克风权限被拒绝，请在浏览器设置中允许访问麦克风', true);
+                        // 尝试重新请求权限
+                        requestMicrophonePermission();
+                    } else if (event.error === 'no-speech') {
+                        showStatus('未检测到语音，请再次尝试', true);
+                        if (isListening) recognition.start();
+                    } else {
+                        showStatus(`语音识别错误: ${event.error}`, true);
+                    }
+                    
+                    stopListening();
+                };
+                
+                return recognition;
+            }
+            
+            function startListening() {
+                if (!recognition) {
+                    recognition = initSpeechRecognition();
+                    if (!recognition) {
+                        showStatus('语音识别初始化失败，正在重新请求权限', true);
+                        requestMicrophonePermission();
+                        return;
+                    }
+                }
+                
+                isListening = true;
+                startVoiceBtn.innerHTML = '<i class="fa fa-stop"></i><span>停止录音</span><span id="voiceDot" class="recording-indicator"></span>';
+                startVoiceBtn.classList.remove('bg-primary', 'hover:bg-primary/90');
+                startVoiceBtn.classList.add('bg-red-500', 'hover:bg-red-600');
+                voiceDot.classList.remove('hidden');
+                
+                try {
+                    recognition.start();
+                    showStatus('正在聆听...');
+                } catch (error) {
+                    console.error('启动语音识别失败:', error);
+                    showStatus('启动语音识别失败，正在重新请求权限', true);
+                    
+                    // 如果启动失败，可能是权限问题，尝试重新请求权限
+                    // 销毁当前实例，重新创建
+                    recognition = null;
+                    requestMicrophonePermission();
+                    stopListening();
+                }
+            }
+            
+            function stopListening() {
+                isListening = false;
+                startVoiceBtn.innerHTML = '<i class="fa fa-microphone"></i><span>语音输入</span>';
+                startVoiceBtn.classList.remove('bg-red-500', 'hover:bg-red-600');
+                startVoiceBtn.classList.add('bg-primary', 'hover:bg-primary/90');
+                voiceDot.classList.add('hidden');
+                showStatus('已停止聆听');
+            }
+            
+            // 语音合成
+            function speakText(text) {
+                if ('speechSynthesis' in window) {
+                    const utterance = new SpeechSynthesisUtterance(text);
+                    utterance.lang = 'zh-CN';
+                    utterance.volume = 1;
+                    utterance.rate = 1;
+                    utterance.pitch = 1;
+                    window.speechSynthesis.speak(utterance);
+                }
+            }
+            
+            // 绑定事件
+            function bindEvents() {
+                addTextBtn.addEventListener('click', () => {
+                    buttonClickEffect(addTextBtn);
+                    const text = textInput.value.trim();
+                    if (text) {
+                        launchWord(text);
+                        textInput.value = '';
+                    } else {
+                        textInput.focus();
+                        showStatus('请输入文字内容', true);
+                    }
+                });
+                
+                textInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        const text = textInput.value.trim();
+                        if (text) {
+                            launchWord(text);
+                            textInput.value = '';
+                        }
+                    }
+                });
+                
+                startVoiceBtn.addEventListener('click', () => {
+                    buttonClickEffect(startVoiceBtn);
+                    if (isListening) {
+                        recognition.stop();
+                        stopListening();
+                    } else {
+                        startListening();
+                    }
+                });
+                
+                launchRandomBtn.addEventListener('click', () => {
+                    buttonClickEffect(launchRandomBtn);
+                    const randomWord = randomWords[Math.floor(Math.random() * randomWords.length)];
+                    launchWord(randomWord);
+                    textInput.value = randomWord;
+                });
+                
+                toggleGravityBtn.addEventListener('click', () => {
+                    buttonClickEffect(toggleGravityBtn);
+                    engine.world.gravity.y = engine.world.gravity.y === 0 ? 0.8 : 0;
+                    const status = engine.world.gravity.y === 0 ? '关' : '开';
+                    toggleGravityBtn.innerHTML = `<i class="fa fa-moon-o"></i><span>重力: ${status}</span>`;
+                    showStatus(`重力已${status}`);
+                });
+                
+                toggleVortexBtn.addEventListener('click', () => {
+                    buttonClickEffect(toggleVortexBtn);
+                    vortexActive = !vortexActive;
+                    const status = vortexActive ? '开' : '关';
+                    toggleVortexBtn.innerHTML = `<i class="fa fa-sync"></i><span>漩涡: ${status}</span>`;
+                    
+                    if (vortexActive) {
+                        vortexVisual.classList.add('animate-spin');
+                        vortexVisual.style.boxShadow = '0 0 40px rgba(139, 92, 246, 0.8), 0 0 80px rgba(139, 92, 246, 0.5), 0 0 120px rgba(139, 92, 246, 0.3)';
+                    } else {
+                        vortexVisual.classList.remove('animate-spin');
+                        vortexVisual.style.boxShadow = '0 0 20px rgba(139, 92, 246, 0.4)';
+                    }
+                    
+                    showStatus(`漩涡已${status}`);
+                });
+                
+                clearAllBtn.addEventListener('click', () => {
+                    buttonClickEffect(clearAllBtn);
+                    characterGroups.forEach(group => {
+                        group.blocks.forEach(block => World.remove(engine.world, block.body));
+                        group.joints.forEach(joint => World.remove(engine.world, joint));
+                    });
+                    
+                    characterGroups = [];
+                    window.speechSynthesis.cancel();
+                    showStatus('已清除所有文字');
+                });
+                
+
+                
+                showStatus('系统已就绪，可开始使用');
+            }
+            
+            // 绘制每个方块及其文字（完全填充）
+            function drawCharacterBlocks(group) {
+                group.blocks.forEach(block => {
+                    const body = block.body;
+                    
+                    ctx.save();
+                    // 平移到方块位置
+                    ctx.translate(body.position.x, body.position.y);
+                    // 旋转以匹配方块角度
+                    ctx.rotate(body.angle);
+                    
+                    // 绘制方块（如果显示方块）
+                    const size = 40;
+                    if (showBlocks) {
+                        ctx.beginPath();
+                        ctx.fillStyle = block.color.bg;
+                        ctx.strokeStyle = block.color.border;
+                        ctx.lineWidth = 2;
+                        
+                        // 绘制圆角矩形
+                        const radius = 6;
+                        const x = -size / 2;
+                        const y = -size / 2;
+                        
+                        ctx.moveTo(x + radius, y);
+                        ctx.arcTo(x + size, y, x + size, y + size, radius);
+                        ctx.arcTo(x + size, y + size, x, y + size, radius);
+                        ctx.arcTo(x, y + size, x, y, radius);
+                        ctx.arcTo(x, y, x + size, y, radius);
+                        ctx.closePath();
+                        
+                        ctx.fill();
+                        ctx.stroke();
+                    }
+                    
+                    // 在方块中心绘制文字（完全填充，无边界）
+                    // 根据方块显示状态调整文字颜色
+                    const textColor = showBlocks ? block.color.text : block.color.border;
+                    
+                    // 设置阴影效果
+                    ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+                    ctx.shadowBlur = 4;
+                    ctx.shadowOffsetX = 2;
+                    ctx.shadowOffsetY = 2;
+                    
+                    // 使用计算好的字体大小
+                    ctx.font = `bold ${block.fontSize}px Inter, system-ui, sans-serif`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    
+                    // 绘制文字描边增强立体感
+                    ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
+                    ctx.lineWidth = 2;
+                    ctx.lineJoin = 'round';
+                    ctx.strokeText(block.char, 0, 1);
+                    
+                    // 绘制文字主体
+                    ctx.fillStyle = textColor;
+                    ctx.fillText(block.char, 0, 1);
+                    
+                    // 添加立体效果的亮边
+                    ctx.shadowColor = 'rgba(255, 255, 255, 0.5)';
+                    ctx.shadowBlur = 2;
+                    ctx.shadowOffsetX = -1;
+                    ctx.shadowOffsetY = -1;
+                    ctx.fillText(block.char, 0, 1);
+                    
+                    // 重置阴影设置
+                    ctx.shadowColor = 'transparent';
+                    ctx.shadowBlur = 0;
+                    ctx.shadowOffsetX = 0;
+                    ctx.shadowOffsetY = 0;
+                    
+                    ctx.restore();
+                });
+            }
+            
+            // 更新循环
+            function update() {
+                requestAnimationFrame(update);
+                
+                // 应用漩涡力
+                if (vortexActive && characterGroups.length > 0) {
+                    applyVortexForces();
+                    checkVortexCapture();
+                }
+                
+                // 更新引擎
+                Engine.update(engine);
+                
+                // 清除画布
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, canvas.width / (window.devicePixelRatio || 1), 600);
+                
+                // 绘制所有文字方块组
+                characterGroups.forEach(group => {
+                    drawCharacterBlocks(group);
+                });
+            }
+            
+            // 初始化
+            function init() {
+                // 设置Canvas渲染属性
+                ctx.imageSmoothingEnabled = true;
+                ctx.imageSmoothingQuality = 'high';
+                
+                // 自动请求麦克风权限
+                requestMicrophonePermission();
+                
+                bindEvents();
+                update();
+                textInput.focus();
+            }
+            
+            // 请求麦克风权限
+            function requestMicrophonePermission() {
+                if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                    navigator.mediaDevices.getUserMedia({ audio: true })
+                        .then(stream => {
+                            // 获取权限成功，立即停止使用麦克风
+                            stream.getTracks().forEach(track => track.stop());
+                            showStatus('麦克风权限已获取');
+                            
+                            // 权限获取成功后，初始化语音识别
+                            if (!recognition) {
+                                recognition = initSpeechRecognition();
+                            }
+                        })
+                        .catch(err => {
+                            console.error('麦克风权限获取失败:', err);
+                            showStatus('麦克风权限获取失败，请手动授权', true);
+                            
+                            // 3秒后自动重试
+                            setTimeout(() => {
+                                showStatus('正在重新请求麦克风权限...');
+                                requestMicrophonePermission();
+                            }, 3000);
+                        });
+                } else {
+                    console.error('浏览器不支持麦克风访问');
+                    showStatus('浏览器不支持麦克风访问', true);
+                }
+            }
+            
+            init();
+        };
+    </script>
+</body>
+</html>
