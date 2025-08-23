@@ -786,6 +786,8 @@
                     gyroActive = false;
                     gyroSwitch.classList.remove('active');
                     showStatus('陀螺仪已关闭');
+                    // 停止陀螺仪事件监听
+                    window.removeEventListener('deviceorientation', handleGyroUpdate);
                 } else {
                     // 请求陀螺仪权限
                     if (typeof DeviceOrientationEvent.requestPermission === 'function') {
@@ -795,6 +797,8 @@
                                     gyroActive = true;
                                     gyroSwitch.classList.add('active');
                                     showStatus('陀螺仪已启用');
+                                    // 启用陀螺仪事件监听
+                                    window.addEventListener('deviceorientation', handleGyroUpdate);
                                 } else {
                                     showStatus('陀螺仪权限被拒绝');
                                 }
@@ -807,6 +811,8 @@
                         gyroActive = true;
                         gyroSwitch.classList.add('active');
                         showStatus('陀螺仪已启用');
+                        // 启用陀螺仪事件监听
+                        window.addEventListener('deviceorientation', handleGyroUpdate);
                     }
                 }
             });
