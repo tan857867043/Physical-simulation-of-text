@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>2D文字物理系统</title>
+    <title>物理系统 - 移动版</title>
     <script src="matter.min.js"></script>
     <!-- 腾讯云语音识别 - 直接使用API调用，不需要SDK -->
     <script>
@@ -347,10 +347,14 @@
         let recognition = null;
         let isListening = false;
         
+        // 设备检测
+        const isMobileDevice = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i.test(navigator.userAgent);
+        
         // 配置
         const CONFIG = {
             physics: {
-                gravity: 1.0, // 优化重力加速度
+                gravity: 1.0, // 基础重力
+                mobileGravity: 0.6, // 移动端重力
                 timeScale: 1,
                 fps: 60
             },
@@ -367,15 +371,18 @@
                 friction: 0.1, // 优化摩擦力
                 frictionAir: 0.005, // 减少空气阻力
                 density: 0.015, // 优化密度
-                collisionDelay: 600, // 缩短碰撞延迟
+                collisionDelay: 200, // 极短碰撞延迟，快速启用碰撞
                 scaleDuration: 400 // 缩短缩放动画时间
             },
             launcher: {
                 x: 100,
                 y: 150,
-                baseForce: 20, // 增强发射力度
-                forceVariation: 8, // 优化力度变化范围
-                angleRange: 25 // 优化发射角度范围
+                baseForce: 10, // 基础发射力度
+                forceVariation: 8, // 力度变化范围
+                angleRange: 25, // 发射角度范围
+                // 移动端适配参数
+                mobileForceScale: 0.6, // 移动端力度缩放
+                mobileMaxForce: 20 // 移动端最大力度
             },
             colors: [
                 { bg: 'rgba(59, 130, 246, 0.95)', text: 'white', border: 'rgba(59, 130, 246, 1)', gradient: ['#3B82F6', '#1D4ED8'] },
@@ -412,8 +419,9 @@
                 const rect = container.getBoundingClientRect();
                 const dpr = window.devicePixelRatio || 1;
                 
-                canvas.width = rect.width * dpr;
-                canvas.height = rect.height * dpr;
+                // 确保画布尺寸是整数，避免亚像素问题
+                canvas.width = Math.floor(rect.width * dpr);
+                canvas.height = Math.floor(rect.height * dpr);
                 canvas.style.width = rect.width + 'px';
                 canvas.style.height = rect.height + 'px';
                 
@@ -429,10 +437,12 @@
                 launcherVisual.style.left = (CONFIG.launcher.x - 20) + 'px';
                 launcherVisual.style.top = (CONFIG.launcher.y - 20) + 'px';
                 
-                // 更新墙体位置
-                if (world) {
-                    updateWalls();
-                }
+                // 更新墙体位置 - 延迟执行确保尺寸稳定
+                setTimeout(() => {
+                    if (world) {
+                        updateWalls();
+                    }
+                }, 100);
             };
             
             // 确保触摸事件能正确获取坐标
@@ -455,28 +465,75 @@
                 walls = [];
             }
             
-            // 创建新墙体
+            // 获取实际显示尺寸（直接使用getBoundingClientRect）
             const container = canvas.parentElement;
             const rect = container.getBoundingClientRect();
             
-            // 优化墙体参数
-            const wallThickness = 30; // 增加墙体厚度
+            // 使用实际显示尺寸，避免DPR计算误差
+            const displayWidth = rect.width;
+            const displayHeight = rect.height;
+            
+            // 移动端专用墙体参数
+            const isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i.test(navigator.userAgent);
+            const wallThickness = isMobile ? 100 : 60; // 移动端使用更厚墙体
+            const extraMargin = isMobile ? 50 : 20; // 移动端额外边距
+            
             const wallOptions = {
                 isStatic: true,
-                friction: 0.3,
-                restitution: 0.2,
+                friction: 1.0, // 最大摩擦力
+                restitution: 0.01, // 最小弹性，防止穿透
                 collisionFilter: {
-                    group: -1 // 确保墙体不会相互碰撞
+                    group: -1,
+                    category: 0x0002,
+                    mask: 0xFFFFFFFF
                 }
             };
             
-            const ground = Bodies.rectangle(rect.width / 2, rect.height, rect.width + 100, wallThickness, wallOptions);
-            const ceiling = Bodies.rectangle(rect.width / 2, 0, rect.width + 100, wallThickness, wallOptions);
-            const leftWall = Bodies.rectangle(0, rect.height / 2, wallThickness, rect.height + 100, wallOptions);
-            const rightWall = Bodies.rectangle(rect.width, rect.height / 2, wallThickness, rect.height + 100, wallOptions);
+            // 创建超大墙体，确保完全覆盖边界
+            const ground = Bodies.rectangle(
+                displayWidth / 2, 
+                displayHeight + wallThickness / 2, 
+                displayWidth + wallThickness * 4, 
+                wallThickness, 
+                wallOptions
+            );
+            
+            const ceiling = Bodies.rectangle(
+                displayWidth / 2, 
+                -wallThickness / 2, 
+                displayWidth + wallThickness * 4, 
+                wallThickness, 
+                wallOptions
+            );
+            
+            const leftWall = Bodies.rectangle(
+                -wallThickness / 2, 
+                displayHeight / 2, 
+                wallThickness, 
+                displayHeight + wallThickness * 4, 
+                wallOptions
+            );
+            
+            const rightWall = Bodies.rectangle(
+                displayWidth + wallThickness / 2, 
+                displayHeight / 2, 
+                wallThickness, 
+                displayHeight + wallThickness * 4, 
+                wallOptions
+            );
             
             walls = [ground, ceiling, leftWall, rightWall];
             World.add(world, walls);
+            
+            // 验证墙体位置
+            console.log('墙体更新完成:', {
+                isMobile,
+                displaySize: { width: displayWidth, height: displayHeight },
+                wallThickness,
+                groundPos: ground.position,
+                leftWallPos: leftWall.position,
+                rightWallPos: rightWall.position
+            });
         }
         
         // 设置物理引擎
@@ -487,10 +544,21 @@
                 timing: {
                     timeScale: CONFIG.physics.timeScale,
                     delta: 1000 / CONFIG.physics.fps
-                }
+                },
+                // 增强碰撞检测精度
+                positionIterations: 6,
+                velocityIterations: 4,
+                constraintIterations: 2
             });
             world = engine.world;
-            world.gravity.y = CONFIG.physics.gravity;
+            
+            world.gravity.y = isMobileDevice ? CONFIG.physics.mobileGravity : CONFIG.physics.gravity;
+            
+            // 设置边界容差为0，确保精确边界检测
+            world.bounds = {
+                min: { x: -Infinity, y: -Infinity },
+                max: { x: Infinity, y: Infinity }
+            };
             
             // 创建初始墙体
             updateWalls();
@@ -678,8 +746,18 @@
             
             const characters = text.split('');
             const totalWidth = characters.length * CONFIG.block.size + (characters.length - 1) * CONFIG.block.gap;
-            const startX = Math.max(CONFIG.block.size / 2, Math.min(rect.width - totalWidth / 2, CONFIG.launcher.x));
-            const startY = CONFIG.launcher.y;
+            
+            // 移动端适配：调整发射位置和安全边距
+            const safeMargin = isMobileDevice ? 80 : 50; // 移动端更大的安全边距
+            const maxX = rect.width - safeMargin;
+            const minX = safeMargin;
+            
+            // 移动端调整发射位置，避免靠近边界
+            const launcherX = isMobileDevice ? Math.min(rect.width * 0.3, CONFIG.launcher.x) : CONFIG.launcher.x;
+            const launcherY = isMobileDevice ? Math.min(rect.height * 0.3, CONFIG.launcher.y) : CONFIG.launcher.y;
+            
+            const startX = Math.max(minX + totalWidth / 2, Math.min(maxX - totalWidth / 2, launcherX));
+            const startY = Math.max(safeMargin, Math.min(rect.height - safeMargin, launcherY));
             
             const color = CONFIG.colors[Math.floor(Math.random() * CONFIG.colors.length)];
             const blocks = [];
@@ -694,8 +772,8 @@
                     density: CONFIG.block.density,
                     collisionFilter: {
                         group: -1, // 初始不参与碰撞
-                        category: 0x0001,
-                        mask: 0x0000 // 初始不与任何物体碰撞
+                        category: 0x0001, // 文字块碰撞类别
+                        mask: 0x0002 // 初始只与墙体碰撞（0x0002是墙体类别）
                     }
                 });
                 
@@ -704,8 +782,8 @@
                     Matter.Body.set(block, {
                         collisionFilter: {
                             group: 0,
-                            category: 0x0001,
-                            mask: 0xFFFFFFFF // 启用所有碰撞
+                            category: 0x0001, // 文字块碰撞类别
+                            mask: 0xFFFFFFFF // 启用与所有物体的碰撞
                         }
                     });
                 }, CONFIG.block.collisionDelay);
@@ -752,9 +830,19 @@
                 World.add(world, joint);
             }
             
-            // 发射
+            // 发射 - 移动端力度适配
             const angle = (Math.random() - 0.5) * CONFIG.launcher.angleRange * Math.PI / 180;
-            const force = CONFIG.launcher.baseForce + (Math.random() - 0.5) * CONFIG.launcher.forceVariation;
+            
+            // 移动端使用缩放后的力度
+            let baseForce = CONFIG.launcher.baseForce;
+            if (isMobileDevice) {
+                baseForce = Math.min(
+                    CONFIG.launcher.baseForce * CONFIG.launcher.mobileForceScale,
+                    CONFIG.launcher.mobileMaxForce
+                );
+            }
+            
+            const force = baseForce + (Math.random() - 0.5) * CONFIG.launcher.forceVariation;
             
             blocks.forEach(block => {
                 Matter.Body.setVelocity(block.body, {
