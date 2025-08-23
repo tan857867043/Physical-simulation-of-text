@@ -341,6 +341,7 @@
     <script>
         // 全局变量
         let engine, world, canvas, ctx;
+        let mouseConstraint; // 添加鼠标约束全局变量
         let characterGroups = [];
         let vortexActive = true;
         let gravityActive = true;
@@ -382,8 +383,8 @@
                 angleRange: 25,        // 角度范围
             },
             joint: {
-                stiffness: 0.08,        // 更自然的刚度，类似index.html
-                damping: 0.05           // 更轻的阻尼，增加弹性
+                stiffness: 0.1,        // 更自然的刚度，类似index.html
+                damping: 0.1           // 更轻的阻尼，增加弹性
             },
             colors: [
                 { bg: 'rgba(59, 130, 246, 0.95)', text: '#1e293b', border: 'rgba(59, 130, 246, 1)', gradient: ['#3B82F6', '#1D4ED8'] },
@@ -405,9 +406,30 @@
             setupCanvas();
             setupPhysics();
             setupEventListeners();
+            optimizeForMobile(); // 添加移动设备优化
             startGameLoop();
             
             showStatus('系统已就绪');
+        }
+        
+        // 移动设备优化
+        function optimizeForMobile() {
+            const isMobile = window.innerWidth < 768 || ('ontouchstart' in window);
+            
+            if (isMobile) {
+                // 调整物理参数，使拖拽在移动设备上更流畅
+                CONFIG.block.frictionAir = 0.01; // 减少空气阻力
+                CONFIG.block.density = 0.01;     // 减轻密度
+                CONFIG.physics.timeScale = 0.9;  // 稍微减慢物理模拟
+                
+                // 调整鼠标约束参数
+                if (mouseConstraint) {
+                    mouseConstraint.constraint.stiffness = 0.2; // 降低刚度，使拖拽更平滑
+                    mouseConstraint.constraint.damping = 0.3;   // 增加阻尼，减少抖动
+                }
+                
+                console.log('已应用移动设备优化');
+            }
         }
         
 
@@ -613,15 +635,27 @@
             // 鼠标/触摸控制
             const mouse = Mouse.create(canvas);
             
-            // 确保触摸事件能被 Mouse 模块正确处理
+            // 完全重写触摸事件处理，确保在移动设备上能够正确拖拽
             canvas.addEventListener('touchstart', function(e) {
                 if (e.touches.length > 0) {
                     const touch = e.touches[0];
-                    const mouseEvent = new MouseEvent('mousedown', {
-                        clientX: touch.clientX,
-                        clientY: touch.clientY
-                    });
-                    canvas.dispatchEvent(mouseEvent);
+                    const rect = canvas.getBoundingClientRect();
+                    
+                    // 直接修改Matter.js的鼠标对象位置
+                    mouse.position.x = (touch.clientX - rect.left);
+                    mouse.position.y = (touch.clientY - rect.top);
+                    mouse.absolute.x = touch.clientX;
+                    mouse.absolute.y = touch.clientY;
+                    
+                    // 强制更新鼠标约束的位置
+                    mouse.mousedownPosition = { x: mouse.position.x, y: mouse.position.y };
+                    mouse.mousedown = true;
+                    
+                    // 标记为脏，确保画布重绘
+                    dirty = true;
+                    
+                    // 显示调试信息
+                    console.log('触摸开始:', { x: mouse.position.x, y: mouse.position.y });
                 }
                 e.preventDefault();
             }, { passive: false });
@@ -629,18 +663,32 @@
             canvas.addEventListener('touchmove', function(e) {
                 if (e.touches.length > 0) {
                     const touch = e.touches[0];
-                    const mouseEvent = new MouseEvent('mousemove', {
-                        clientX: touch.clientX,
-                        clientY: touch.clientY
-                    });
-                    canvas.dispatchEvent(mouseEvent);
+                    const rect = canvas.getBoundingClientRect();
+                    
+                    // 直接修改Matter.js的鼠标对象位置
+                    mouse.position.x = (touch.clientX - rect.left);
+                    mouse.position.y = (touch.clientY - rect.top);
+                    mouse.absolute.x = touch.clientX;
+                    mouse.absolute.y = touch.clientY;
+                    
+                    // 确保鼠标状态正确
+                    mouse.mousemove = true;
+                    
+                    // 标记为脏，确保画布重绘
+                    dirty = true;
                 }
                 e.preventDefault();
             }, { passive: false });
             
             canvas.addEventListener('touchend', function(e) {
-                const mouseEvent = new MouseEvent('mouseup', {});
-                canvas.dispatchEvent(mouseEvent);
+                // 重置鼠标状态
+                mouse.mouseup = true;
+                mouse.mousedown = false;
+                
+                // 标记为脏，确保画布重绘
+                dirty = true;
+                
+                console.log('触摸结束');
                 e.preventDefault();
             }, { passive: false });
             
@@ -652,7 +700,7 @@
             };
             
             // 鼠标控制 - 优化鼠标拖动，支持触摸
-            const mouseConstraint = MouseConstraint.create(engine, {
+            mouseConstraint = MouseConstraint.create(engine, {
                 mouse: mouse,
                 constraint: {
                     stiffness: 0.8, // 增加刚度，让拖动更精确
@@ -662,9 +710,44 @@
                 },
                 // 确保在移动设备上能够正常工作
                 collisionFilter: {
-                    mask: 0xFFFFFFFF,
-                    category: 0x0001
+                    mask: 0x0001,    // 只与文字块类别(0x0001)交互
+                    category: 0x0004  // 使用独立的类别，避免与墙体冲突
                 }
+            });
+            
+            // 增强鼠标事件监听，确保在移动设备上能够正确拖拽
+            Events.on(mouseConstraint, 'startdrag', function(event) {
+                if (event.body) {
+                    console.log('开始拖拽:', event.body.id);
+                    // 增加拖拽时的视觉反馈
+                    event.body.render = event.body.render || {};
+                    event.body.render.lineWidth = 2;
+                    event.body.frictionAir = 0.02; // 增加空气阻力，使拖拽更平滑
+                    
+                    // 显示状态消息
+                    showStatus('拖拽中...');
+                }
+            });
+            
+            Events.on(mouseConstraint, 'enddrag', function(event) {
+                if (event.body) {
+                    console.log('结束拖拽:', event.body.id);
+                    // 恢复原始设置
+                    event.body.render = event.body.render || {};
+                    event.body.render.lineWidth = 1;
+                    event.body.frictionAir = CONFIG.block.frictionAir;
+                    
+                    // 清除状态消息
+                    setTimeout(() => {
+                        document.getElementById('statusMessage').classList.remove('show');
+                    }, 500);
+                }
+            });
+            
+            // 监听鼠标移动，提高触摸响应性
+            Events.on(mouseConstraint, 'mousemove', function(event) {
+                // 标记为脏，确保画布重绘
+                dirty = true;
             });
             
             World.add(world, mouseConstraint);
@@ -789,21 +872,23 @@
                     density: CONFIG.block.density,
                     sleepThreshold: 15, // 添加休眠阈值，减少静止物体的计算
                     collisionFilter: {
-                        group: -1, // 初始不参与碰撞
+                        group: 0, // 使用0而不是-1，允许与鼠标约束交互
                         category: 0x0001, // 文字块碰撞类别
-                        mask: 0x0002 // 初始只与墙体碰撞（0x0002是墙体类别）
+                        mask: 0xFFFFFFFF // 允许与所有物体碰撞，包括鼠标约束
+                    },
+                    // 添加自定义属性，标记为可拖拽
+                    plugin: {
+                        attractors: [],
+                        draggable: true
                     }
                 });
                 
                 // 延迟后启用碰撞
+                // 不再需要延迟修改碰撞过滤器，因为我们已经设置了正确的值
+                // 但保留延迟以确保文字块有时间正确定位
                 setTimeout(() => {
-                    Matter.Body.set(block, {
-                        collisionFilter: {
-                            group: 0,
-                            category: 0x0001, // 文字块碰撞类别
-                            mask: 0xFFFFFFFF // 启用与所有物体的碰撞
-                        }
-                    });
+                    // 确保文字块已经准备好进行交互
+                    Matter.Sleeping.set(block, false);
                 }, CONFIG.block.collisionDelay);
                 
                 // 添加缩放动画
