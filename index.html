@@ -349,7 +349,7 @@
         let characterGroups = [];
         let vortexActive = true;
         let gravityActive = true;
-        let gyroActive = false;
+        let gyroActive = false; // 初始化关闭陀螺仪
         let recognition = null;
         let isListening = false;
         let dirty = true;
@@ -774,6 +774,42 @@
             const gravitySwitch = document.getElementById('gravitySwitch');
             const vortexSwitch = document.getElementById('vortexSwitch');
             const gyroSwitch = document.getElementById('gyroSwitch');
+            
+            // 陀螺仪开关事件监听
+            gyroSwitch.addEventListener('click', () => {
+                if (!('DeviceOrientationEvent' in window)) {
+                    showStatus('设备不支持陀螺仪');
+                    return;
+                }
+                
+                if (gyroActive) {
+                    gyroActive = false;
+                    gyroSwitch.classList.remove('active');
+                    showStatus('陀螺仪已关闭');
+                } else {
+                    // 请求陀螺仪权限
+                    if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+                        DeviceOrientationEvent.requestPermission()
+                            .then(permissionState => {
+                                if (permissionState === 'granted') {
+                                    gyroActive = true;
+                                    gyroSwitch.classList.add('active');
+                                    showStatus('陀螺仪已启用');
+                                } else {
+                                    showStatus('陀螺仪权限被拒绝');
+                                }
+                            })
+                            .catch(error => {
+                                console.error('陀螺仪权限请求失败:', error);
+                                showStatus('陀螺仪初始化失败');
+                            });
+                    } else {
+                        gyroActive = true;
+                        gyroSwitch.classList.add('active');
+                        showStatus('陀螺仪已启用');
+                    }
+                }
+            });
             
             // 添加文字 - 同时处理点击和触摸事件
             const handleAddText = () => {
