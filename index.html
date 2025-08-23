@@ -7,7 +7,7 @@
     <meta name="x5-orientation" content="landscape">
     <meta name="full-screen" content="yes">
     <meta name="x5-fullscreen" content="true">
-    <title>物理系统 - 移动版</title>
+    <title>2D文字物理系统 - 移动版</title>
     <script src="matter.min.js"></script>
     <!-- 腾讯云语音识别 - 直接使用API调用，不需要SDK -->
     <script>
@@ -413,6 +413,7 @@
         // 初始化
         function init() {
             handleScreenOrientation();
+            showLandscapeHint();
             setupCanvas();
             setupPhysics();
             setupEventListeners();
@@ -420,6 +421,44 @@
             startGameLoop();
             
             showStatus('系统已就绪');
+        }
+        
+        // 显示横屏提示
+        function showLandscapeHint() {
+            if (!isMobileDevice) return;
+            
+            // 检查当前方向
+            const checkOrientation = () => {
+                const isPortrait = window.innerHeight > window.innerWidth;
+                const hint = document.getElementById('landscapeHint');
+                
+                if (isPortrait) {
+                    if (!hint) {
+                        const hintDiv = document.createElement('div');
+                        hintDiv.id = 'landscapeHint';
+                        hintDiv.className = 'landscape-hint';
+                        hintDiv.innerHTML = `
+                            <div style="font-size: 1.2rem; margin-bottom: 0.5rem;">📱</div>
+                            <div>请将设备旋转至横屏模式</div>
+                            <div style="font-size: 0.75rem; margin-top: 0.5rem; opacity: 0.8;">
+                                以获得最佳体验
+                            </div>
+                        `;
+                        document.body.appendChild(hintDiv);
+                    }
+                } else {
+                    if (hint) {
+                        hint.remove();
+                    }
+                }
+            };
+            
+            // 初始检查
+            checkOrientation();
+            
+            // 监听方向变化
+            window.addEventListener('resize', checkOrientation);
+            window.addEventListener('orientationchange', checkOrientation);
         }
         
         // 处理屏幕方向
@@ -441,24 +480,52 @@
         function lockLandscape() {
             if (!isMobileDevice) return;
             
-            try {
-                // 尝试使用屏幕方向API
-                if (screen.orientation && screen.orientation.lock) {
-                    screen.orientation.lock('landscape').catch(() => {
-                        console.log('屏幕方向锁定失败，使用CSS替代');
-                        forceLandscapeCSS();
-                    });
-                } else if (screen.lockOrientation) {
-                    screen.lockOrientation('landscape');
-                } else if (screen.webkitLockOrientation) {
-                    screen.webkitLockOrientation('landscape');
-                } else {
+            // 延迟执行，确保页面加载完成
+            setTimeout(() => {
+                try {
+                    // 检测当前方向
+                    const isPortrait = window.innerHeight > window.innerWidth;
+                    
+                    if (isPortrait) {
+                        // 尝试多种API方式
+                        const lockPromises = [];
+                        
+                        // 标准API
+                        if (screen.orientation && screen.orientation.lock) {
+                            lockPromises.push(
+                                screen.orientation.lock('landscape-primary')
+                                    .catch(() => screen.orientation.lock('landscape'))
+                            );
+                        }
+                        
+                        // 旧版API
+                        if (screen.lockOrientation) {
+                            screen.lockOrientation('landscape-primary');
+                        } else if (screen.webkitLockOrientation) {
+                            screen.webkitLockOrientation('landscape-primary');
+                        } else if (screen.mozLockOrientation) {
+                            screen.mozLockOrientation('landscape-primary');
+                        }
+                        
+                        // 等待API结果
+                        Promise.allSettled(lockPromises).then(results => {
+                            const success = results.some(r => r.status === 'fulfilled');
+                            if (!success) {
+                                console.log('API锁定失败，启用CSS替代');
+                                forceLandscapeCSS();
+                            }
+                        });
+                        
+                        // 如果API都不支持，直接使用CSS
+                        if (lockPromises.length === 0) {
+                            forceLandscapeCSS();
+                        }
+                    }
+                } catch (e) {
+                    console.log('屏幕方向API错误，使用CSS替代:', e);
                     forceLandscapeCSS();
                 }
-            } catch (e) {
-                console.log('屏幕方向API不可用，使用CSS替代');
-                forceLandscapeCSS();
-            }
+            }, 500);
         }
         
         // CSS强制横屏
@@ -468,7 +535,16 @@
             const style = document.createElement('style');
             style.id = 'landscape-force';
             style.textContent = `
+                /* 横屏优化 */
                 @media screen and (orientation: portrait) {
+                    html, body {
+                        margin: 0;
+                        padding: 0;
+                        height: 100vh;
+                        width: 100vw;
+                        overflow: hidden;
+                    }
+                    
                     body {
                         transform: rotate(90deg);
                         transform-origin: center center;
@@ -477,13 +553,62 @@
                         left: 0;
                         width: 100vh;
                         height: 100vw;
-                        overflow: hidden;
+                        background-color: var(--gray-50);
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
                     }
                     
                     .app-container {
                         width: 100vh;
                         height: 100vw;
                         transform: rotate(0deg);
+                        margin: 0;
+                        border-radius: 0;
+                        box-shadow: none;
+                    }
+                    
+                    .canvas-container {
+                        margin: 0;
+                        border-radius: 0;
+                        box-shadow: none;
+                    }
+                    
+                    .bottom-controls {
+                        position: absolute;
+                        bottom: 0;
+                        left: 0;
+                        right: 0;
+                        border-radius: 0;
+                    }
+                    
+                    /* 横屏提示 */
+                    .landscape-hint {
+                        position: fixed;
+                        top: 50%;
+                        left: 50%;
+                        transform: translate(-50%, -50%);
+                        background: rgba(0, 0, 0, 0.8);
+                        color: white;
+                        padding: 1rem;
+                        border-radius: 0.5rem;
+                        font-size: 0.875rem;
+                        z-index: 9999;
+                        text-align: center;
+                        pointer-events: none;
+                    }
+                }
+                
+                /* 横屏模式优化 */
+                @media screen and (orientation: landscape) {
+                    .app-container {
+                        border-radius: 0;
+                        margin: 0;
+                    }
+                    
+                    .canvas-container {
+                        border-radius: 0;
+                        margin: 0;
                     }
                 }
             `;
@@ -500,27 +625,48 @@
         
         // 初始化陀螺仪
         function initGyroscope() {
-            if (!isMobileDevice) return;
+            if (!isMobileDevice) {
+                showStatus('陀螺仪仅支持移动设备');
+                return;
+            }
+            
+            const gyroscopeSwitch = document.getElementById('gyroscopeSwitch');
+            const gyroscopeText = gyroscopeSwitch.querySelector('.switch-text');
             
             // 检查设备是否支持陀螺仪
             if (window.DeviceOrientationEvent) {
                 // iOS 13+ 需要用户授权
                 if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+                    gyroscopeText.textContent = '陀螺仪(请求权限)';
+                    showStatus('正在请求陀螺仪权限...');
+                    
                     DeviceOrientationEvent.requestPermission()
                         .then(response => {
                             if (response === 'granted') {
+                                gyroscopeText.textContent = '陀螺仪';
                                 enableGyroscope();
+                                showGyroscopeFeedback('陀螺仪已启用');
                             } else {
-                                console.log('陀螺仪权限被拒绝');
+                                gyroscopeText.textContent = '陀螺仪(权限拒绝)';
+                                showStatus('陀螺仪权限被拒绝');
+                                showGyroscopeFeedback('权限被拒绝');
                             }
                         })
-                        .catch(console.error);
+                        .catch(error => {
+                            console.error('陀螺仪权限请求失败:', error);
+                            gyroscopeText.textContent = '陀螺仪(错误)';
+                            showStatus('陀螺仪初始化失败');
+                            showGyroscopeFeedback('初始化失败');
+                        });
                 } else {
                     // Android 或其他支持设备
                     enableGyroscope();
+                    showGyroscopeFeedback('陀螺仪已启用');
                 }
             } else {
                 console.log('设备不支持陀螺仪');
+                showStatus('设备不支持陀螺仪');
+                showGyroscopeFeedback('设备不支持');
             }
         }
         
@@ -549,33 +695,111 @@
         
         // 根据设备方向更新重力
         function updateGravityFromOrientation() {
-            const { beta, gamma } = deviceOrientation;
+            const { beta, gamma, alpha } = deviceOrientation;
             
-            // 将倾斜角度转换为重力向量
-            // beta: 前后倾斜 -> 影响Y轴重力
-            // gamma: 左右倾斜 -> 影响X轴重力
-            const sensitivity = 0.02; // 灵敏度调节
-            const maxAngle = 45; // 最大有效倾斜角度
+            // 高级陀螺仪处理
+            const smoothing = 0.15; // 平滑系数
+            const deadZone = 2; // 死区角度，减少微小抖动
+            const maxAngle = 35; // 最大有效角度，更自然
+            const baseGravity = isMobileDevice ? CONFIG.physics.mobileGravity : CONFIG.physics.gravity;
             
-            const betaClamped = Math.max(-maxAngle, Math.min(maxAngle, beta));
-            const gammaClamped = Math.max(-maxAngle, Math.min(maxAngle, gamma));
+            // 计算相对倾斜角度（相对于水平面）
+            const tiltX = gamma; // 左右倾斜
+            const tiltY = beta - 90; // 前后倾斜（调整为0度为水平）
             
-            const gravityY = isMobileDevice ? CONFIG.physics.mobileGravity : CONFIG.physics.gravity;
+            // 应用死区和限制
+            const clampedTiltX = Math.abs(tiltX) > deadZone ? 
+                Math.max(-maxAngle, Math.min(maxAngle, tiltX)) : 0;
             
-            // 计算新的重力向量
-            world.gravity.x = -gammaClamped * sensitivity;
-            world.gravity.y = betaClamped * sensitivity + gravityY;
+            const clampedTiltY = Math.abs(tiltY) > deadZone ? 
+                Math.max(-maxAngle, Math.min(maxAngle, tiltY)) : 0;
             
-            // 限制重力大小，防止过度反应
-            const maxGravity = gravityY * 2;
-            world.gravity.x = Math.max(-maxGravity, Math.min(maxGravity, world.gravity.x));
-            world.gravity.y = Math.max(0.1, Math.min(maxGravity * 2, world.gravity.y));
+            // 平滑重力变化
+            const targetGravityX = -clampedTiltX * 0.025;
+            const targetGravityY = clampedTiltY * 0.025 + baseGravity;
+            
+            // 平滑过渡
+            world.gravity.x = world.gravity.x + (targetGravityX - world.gravity.x) * smoothing;
+            world.gravity.y = world.gravity.y + (targetGravityY - world.gravity.y) * smoothing;
+            
+            // 限制重力范围
+            const maxGravity = baseGravity * 1.8;
+            world.gravity.x = Math.max(-maxGravity * 0.8, Math.min(maxGravity * 0.8, world.gravity.x));
+            world.gravity.y = Math.max(baseGravity * 0.3, Math.min(maxGravity, world.gravity.y));
+            
+            // 添加旋转效果（可选）
+            if (gyroscopeActive) {
+                updateVisualTiltEffect(clampedTiltX, clampedTiltY);
+            }
+        }
+        
+        // 视觉倾斜效果
+        function updateVisualTiltEffect(tiltX, tiltY) {
+            const vortex = document.getElementById('vortexVisual');
+            const launcher = document.getElementById('launcherVisual');
+            
+            // 轻微倾斜视觉元素，提供反馈
+            const maxTiltEffect = 5; // 最大视觉倾斜角度
+            const scaleX = 1 + (tiltX / 90) * 0.1;
+            const scaleY = 1 + (tiltY / 90) * 0.1;
+            
+            if (vortex) {
+                vortex.style.transform = `scale(${scaleX}, ${scaleY}) rotate(${tiltX * 0.5}deg)`;
+            }
+            if (launcher) {
+                launcher.style.transform = `scale(${scaleX}, ${scaleY}) rotate(${tiltY * 0.5}deg)`;
+            }
+        }
+        
+        // 陀螺仪反馈提示
+        function showGyroscopeFeedback(message) {
+            const feedback = document.createElement('div');
+            feedback.id = 'gyroscopeFeedback';
+            feedback.style.cssText = `
+                position: fixed;
+                top: 50px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: rgba(0, 0, 0, 0.8);
+                color: white;
+                padding: 10px 20px;
+                border-radius: 20px;
+                font-size: 14px;
+                z-index: 1000;
+                animation: fadeInOut 2s ease-in-out;
+                pointer-events: none;
+            `;
+            
+            // 添加淡入淡出动画
+            const style = document.createElement('style');
+            style.textContent = `
+                @keyframes fadeInOut {
+                    0% { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+                    20% { opacity: 1; transform: translateX(-50%) translateY(0); }
+                    80% { opacity: 1; transform: translateX(-50%) translateY(0); }
+                    100% { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+                }
+            `;
+            document.head.appendChild(style);
+            
+            feedback.textContent = message;
+            document.body.appendChild(feedback);
+            
+            setTimeout(() => {
+                if (feedback.parentNode) {
+                    feedback.parentNode.removeChild(feedback);
+                }
+                if (style.parentNode) {
+                    style.parentNode.removeChild(style);
+                }
+            }, 2000);
         }
         
         // 切换陀螺仪状态
         function toggleGyroscope() {
             if (!isMobileDevice) {
                 showStatus('仅支持移动设备');
+                showGyroscopeFeedback('仅支持移动设备');
                 return;
             }
             
@@ -583,7 +807,6 @@
             
             if (gyroscopeActive) {
                 initGyroscope();
-                showStatus('陀螺仪已开启');
             } else {
                 window.removeEventListener('deviceorientation', handleDeviceOrientation);
                 
@@ -592,6 +815,10 @@
                 world.gravity.y = isMobileDevice ? CONFIG.physics.mobileGravity : CONFIG.physics.gravity;
                 
                 showStatus('陀螺仪已关闭');
+                showGyroscopeFeedback('陀螺仪已关闭');
+                
+                // 重置视觉倾斜效果
+                updateVisualTiltEffect(0, 0);
             }
         }
         
