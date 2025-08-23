@@ -2,1635 +2,717 @@
 <html lang="zh">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="screen-orientation" content="landscape">
-    <meta name="x5-orientation" content="landscape">
-    <meta name="full-screen" content="yes">
-    <meta name="x5-fullscreen" content="true">
-    <title>2D文字物理系统 - 2.T</title>
-    <script src="matter.min.js"></script>
-    <script>
-        // 解构 Matter.js 模块
-        const { Engine, Render, World, Bodies, Body, Composite, Composites, Constraint, Mouse, MouseConstraint, Events } = Matter;
-    </script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文字顶满方块的物理系统</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/matter-js@0.19.0/build/matter.min.js"></script>
     
-    <style>
-        /* 基础样式 */
-        :root {
-            --primary: #3B82F6;
-            --secondary: #10B981;
-            --accent: #EC4899;
-            --dark: #1E293B;
-            --vortex: #8B5CF6;
-            --gray-50: #F9FAFB;
-            --gray-100: #F3F4F6;
-            --gray-300: #D1D5DB;
-            --gray-600: #4B5563;
-            --gray-700: #374151;
-            --red-500: #EF4444;
-            --red-600: #DC2626;
-            --blue-50: #EFF6FF;
-            --blue-700: #1D4ED8;
-            --green-500: #10B981;
-            --orange-500: #F97316;
-        }
-        
-        /* 通用样式 */
-        * {
-            box-sizing: border-box;
-            -webkit-tap-highlight-color: transparent;
-        }
-        
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', system-ui, sans-serif;
-            background-color: var(--gray-50);
-            margin: 0;
-            padding: 0;
-            height: 100vh;
-            overflow: hidden;
-            touch-action: none;
-            -webkit-user-select: none;
-            user-select: none;
-        }
-        
-        .app-container {
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-            position: relative;
-        }
-        
-        /* 主内容区域 */
-        .main-content {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
-        
-        /* 物理画布区域 */
-        .canvas-container {
-            flex: 1;
-            position: relative;
-            background-color: white;
-            margin: 0.5rem;
-            border-radius: 1rem;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-            overflow: hidden;
-        }
-        
-        #physicsCanvas {
-            width: 100%;
-            height: 100%;
-            display: block;
-        }
-        
-        /* 视觉元素 */
-        .vortex-core {
-            position: absolute;
-            width: 3rem;
-            height: 3rem;
-            background-color: var(--vortex);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: rgb(158, 157, 157);
-            box-shadow: 0 0 2rem rgba(139, 92, 246, 0.5);
-            animation: vortex-pulse 3s infinite;
-            z-index: 10;
-        }
-        
-        .launcher {
-            position: absolute;
-            width: 2.5rem;
-            height: 2.5rem;
-            background-color: var(--primary);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            z-index: 10;
-        }
-        
-        @keyframes vortex-pulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.1); }
-        }
-        
-        /* 底部控制区域 */
-        .bottom-controls {
-            background-color: white;
-            padding: 0.75rem;
-            box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.1);
-        }
-        
-        .input-section {
-            display: flex;
-            gap: 0.5rem;
-            margin-bottom: 0.75rem;
-        }
-        
-        .text-input {
-            flex: 1;
-            padding: 0.75rem 1rem;
-            border: 1px solid var(--gray-300);
-            border-radius: 0.5rem;
-            font-size: 1rem;
-            outline: none;
-            -webkit-appearance: none;
-        }
-        
-        .text-input:focus {
-            border-color: var(--primary);
-            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
-        }
-        
-        .btn {
-            padding: 0.75rem 1rem;
-            border: none;
-            border-radius: 0.5rem;
-            font-size: 1rem;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            min-width: 3rem;
-            -webkit-tap-highlight-color: transparent;
-        }
-        
-        .btn:active {
-            transform: scale(0.95);
-        }
-        
-        .btn-primary {
-            background-color: var(--secondary);
-            color: white;
-        }
-        
-        .btn-danger {
-            background-color: var(--red-500);
-            color: white;
-        }
-        
-        .btn-voice {
-            background-color: var(--primary);
-            color: white;
-        }
-        
-        .btn-voice.recording {
-            background-color: var(--red-500);
-            animation: pulse 1.5s infinite;
-        }
-        
-        /* 开关区域 */
-        .switch-section {
-            display: flex;
-            gap: 0.5rem;
-            justify-content: space-around;
-        }
-        
-        .switch-item {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-size: 0.875rem;
-            color: var(--gray-700);
-        }
-        
-        .switch {
-            position: relative;
-            width: 3rem;
-            height: 1.5rem;
-            background-color: var(--gray-300);
-            border-radius: 0.75rem;
-            cursor: pointer;
-            transition: background-color 0.2s ease;
-        }
-        
-        .switch.active {
-            background-color: var(--secondary);
-        }
-        
-        .switch-slider {
-            position: absolute;
-            top: 0.125rem;
-            left: 0.125rem;
-            width: 1.25rem;
-            height: 1.25rem;
-            background-color: white;
-            border-radius: 50%;
-            transition: transform 0.2s ease;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-        }
-        
-        .switch.active .switch-slider {
-            transform: translateX(1.5rem);
-        }
-        
-        /* 状态消息 */
-        .status-message {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background-color: rgba(0, 0, 0, 0.8);
-            color: white;
-            padding: 1rem 1.5rem;
-            border-radius: 0.5rem;
-            font-size: 0.875rem;
-            z-index: 1000;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-            pointer-events: none;
-        }
-        
-        .status-message.show {
-            opacity: 1;
-        }
-        
-        /* 响应式设计 */
-        @media (max-width: 480px) {
-            .canvas-container {
-                margin: 0.25rem;
-                border-radius: 0.75rem;
-            }
-            
-            .bottom-controls {
-                padding: 0.5rem;
-            }
-            
-            .text-input {
-                padding: 0.625rem 0.875rem;
-                font-size: 0.875rem;
-            }
-            
-            .btn {
-                padding: 0.625rem 0.875rem;
-                font-size: 0.875rem;
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3B82F6',
+                        secondary: '#10B981',
+                        accent: '#EC4899',
+                        dark: '#1E293B',
+                        vortex: '#8B5CF6',
+                    },
+                    fontFamily: {
+                        inter: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                }
             }
         }
-        
-        /* 图标样式 */
-        .icon {
-            font-size: 1.25rem;
-        }
-        
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.7; }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .vortex-core {
+                @apply absolute rounded-full flex items-center justify-center text-white;
+                box-shadow: 0 0 40px rgba(139, 92, 246, 0.8), 
+                            0 0 80px rgba(139, 92, 246, 0.5),
+                            0 0 120px rgba(139, 92, 246, 0.3);
+                animation: vortex-pulse 3s infinite;
+            }
+            @keyframes vortex-pulse {
+                0%, 100% { transform: scale(1); }
+                50% { transform: scale(1.05); }
+            }
+            .launcher {
+                @apply absolute bg-primary rounded-full flex items-center justify-center text-white shadow-lg;
+            }
+            .btn-active {
+                @apply transform scale-95;
+            }
+            .launch-animation {
+                animation: launch-pulse 0.5s ease-out;
+            }
+            @keyframes launch-pulse {
+                0% { transform: scale(1); }
+                50% { transform: scale(1.2); }
+                100% { transform: scale(1); }
+            }
+            .recording-indicator {
+                @apply inline-block w-3 h-3 bg-red-500 rounded-full animate-pulse ml-2;
+            }
         }
     </style>
 </head>
-<body>
-    <div class="app-container">
-        <div class="main-content">
-            <div class="canvas-container">
-                <canvas id="physicsCanvas"></canvas>
-                
-                <!-- 漩涡核心 -->
-                <div id="vortexVisual" class="vortex-core">
-                    <span class="icon">🌀</span>
-                </div>
-                
-                <!-- 发射器 -->
-                <div id="launcherVisual" class="launcher">
-                    <span class="icon">🚀</span>
+<body class="bg-gray-50 font-inter min-h-screen">
+    <div class="container mx-auto px-4 py-6 max-w-5xl">
+        <header class="text-center mb-6">
+            <h1 class="text-[clamp(1.7rem,4vw,2.3rem)] font-bold text-dark mb-2">文字顶满方块的物理系统</h1>
+            <p class="text-gray-600 text-lg">文字完全填充方块，不留边距</p>
+        </header>
+
+        <!-- 控制区域 -->
+        <div class="bg-white rounded-xl shadow-md p-5 mb-6">
+            <div class="flex flex-col md:flex-row gap-4 items-center">
+                <div class="flex-1 w-full">
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">输入方式</label>
+                    <div class="flex flex-wrap gap-3">
+                        <button id="startVoice" class="bg-primary hover:bg-primary/90 text-white px-5 py-2.5 rounded-lg transition-all duration-300 flex items-center gap-2">
+                            <i class="fa fa-microphone"></i>
+                            <span>语音输入</span>
+                            <span id="voiceDot" class="recording-indicator hidden"></span>
+                        </button>
+                        
+                        <div class="flex-1 min-w-[200px]">
+                            <div class="flex">
+                                <input type="text" id="textInput" 
+                                    class="flex-1 px-4 py-2.5 border border-gray-300 rounded-l-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                                    placeholder="输入文字...">
+                                <button id="addText" class="bg-secondary hover:bg-secondary/90 text-white px-4 py-2.5 rounded-r-lg transition-colors duration-300">
+                                    <i class="fa fa-paper-plane"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
+
+            <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                <button id="launchRandom" class="bg-accent hover:bg-accent/90 text-white px-3 py-2 rounded-lg transition-colors duration-300 flex items-center justify-center gap-2">
+                    <i class="fa fa-random"></i>
+                    <span>随机发射</span>
+                </button>
+                
+                <button id="toggleGravity" class="bg-gray-600 hover:bg-gray-700 text-white px-3 py-2 rounded-lg transition-colors duration-300 flex items-center justify-center gap-2">
+                    <i class="fa fa-moon-o"></i>
+                    <span>重力: 开</span>
+                </button>
+                
+                <button id="toggleVortex" class="bg-vortex hover:bg-vortex/90 text-white px-3 py-2 rounded-lg transition-colors duration-300 flex items-center justify-center gap-2">
+                    <i class="fa fa-sync"></i>
+                    <span>漩涡: 开</span>
+                </button>
+                
+                <button id="clearAll" class="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg transition-colors duration-300 flex items-center justify-center gap-2">
+                    <i class="fa fa-trash"></i>
+                    <span>清除所有</span>
+                </button>
+            </div>
         </div>
-        
-        <!-- 底部控制区域 -->
-        <div class="bottom-controls">
-            <!-- 输入区域 -->
-            <div class="input-section">
-                <input type="text" id="textInput" class="text-input" placeholder="输入文字..." maxlength="20">
-                <button id="addTextBtn" class="btn btn-primary">
-                    <span class="icon">📤</span>
-                </button>
-                <button id="voiceBtn" class="btn btn-voice">
-                    <span class="icon">🎤</span>
-                </button>
-                <button id="clearBtn" class="btn btn-danger">
-                    <span class="icon">🗑️</span>
-                </button>
+
+        <!-- 物理模拟区域 -->
+        <div class="relative bg-white rounded-xl shadow-lg overflow-hidden">
+            <canvas id="physicsCanvas" class="w-full" height="600"></canvas>
+            
+            <!-- 漩涡核心（视觉效果） -->
+            <div id="vortexVisual" class="vortex-core w-16 h-16 bg-vortex/80">
+                <i class="fa fa-sync text-2xl animate-spin"></i>
             </div>
             
-            <!-- 开关区域 -->
-            <div class="switch-section">
-                <div class="switch-item">
-                    <span>重力</span>
-                    <div id="gravitySwitch" class="switch active">
-                        <div class="switch-slider"></div>
-                    </div>
-                </div>
-                <div class="switch-item">
-                    <span>漩涡</span>
-                    <div id="vortexSwitch" class="switch active">
-                        <div class="switch-slider"></div>
-                    </div>
-                </div>
-                <div class="switch-item">
-                    <span>陀螺仪</span>
-                    <div id="gyroscopeSwitch" class="switch">
-                        <div class="switch-slider"></div>
-                    </div>
-                </div>
+            <!-- 发射器（视觉效果）- 位置上移 -->
+            <div id="launcherVisual" class="launcher w-12 h-12">
+                <i class="fa fa-rocket"></i>
             </div>
         </div>
-        
-        <!-- 状态消息 -->
-        <div id="statusMessage" class="status-message"></div>
+
+        <!-- 状态提示区域 -->
+        <div id="statusMessage" class="mt-4 p-3 rounded-lg bg-blue-50 text-blue-700 hidden">
+            <i class="fa fa-info-circle mr-2"></i>
+            <span id="statusText">系统就绪</span>
+        </div>
+
     </div>
 
     <script>
-        // 全局变量
-        let engine, world, canvas, ctx;
-        let characterGroups = [];
-        let vortexActive = true;
-        let gravityActive = true;
-        let recognition = null;
-        let isListening = false;
-        let gyroscopeActive = false;
-        let deviceOrientation = { alpha: 0, beta: 0, gamma: 0 };
-        
-        // 设备检测
-        const isMobileDevice = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i.test(navigator.userAgent);
-        
-        // 配置
-        // ===== 系统可调参数配置 =====
-        const CONFIG = {
-            physics: {
-                gravity: 1.0,           // 重力大小
-                mobileGravity: 0.6,     // 移动端重力
-                timeScale: 1,           // 时间缩放
-                fps: 60                 // 帧率
-            },
-            vortex: {
-                strength: 0.006,        // 漩涡力度
-                captureRadius: 60,      // 捕获半径
-                rotationForce: 0.0006,  // 旋转力
-                xPosition: 0.75         // 水平位置(0-1)
-            },
-            block: {
-                size: 35,               // 方块大小
-                gap: 4,                 // 方块间隙
-                restitution: 0.6,       // 弹性
-                friction: 0.1,          // 摩擦力
-                frictionAir: 0.005,     // 空气阻力
-                density: 0.015,         // 密度
-                collisionDelay: 200,   // 碰撞延迟
-                scaleDuration: 400      // 缩放动画时间
-            },
-            launcher: {
-                x: 100,                 // 发射器X位置
-                y: 150,                 // 发射器Y位置
-                baseForce: 10,          // 基础发射力
-                forceVariation: 8,      // 力度变化范围
-                angleRange: 25,        // 角度范围
-                mobileForceScale: 0.6,  // 移动端力度缩放
-                mobileMaxForce: 20      // 移动端最大力度
-            },
-            joint: {
-                stiffness: 0.08,        // 更自然的刚度，类似index.html
-                damping: 0.05           // 更轻的阻尼，增加弹性
-            },
-            colors: [
-                { bg: 'rgba(59, 130, 246, 0.95)', text: '#1e293b', border: 'rgba(59, 130, 246, 1)', gradient: ['#3B82F6', '#1D4ED8'] },
-                { bg: 'rgba(16, 185, 129, 0.95)', text: '#064e3b', border: 'rgba(16, 185, 129, 1)', gradient: ['#10B981', '#059669'] },
-                { bg: 'rgba(236, 72, 153, 0.95)', text: '#500724', border: 'rgba(236, 72, 153, 1)', gradient: ['#EC4899', '#BE185D'] },
-                { bg: 'rgba(245, 158, 11, 0.95)', text: '#451a03', border: 'rgba(245, 158, 11, 1)', gradient: ['#F59E0B', '#D97706'] },
-                { bg: 'rgba(239, 68, 68, 0.95)', text: '#7f1d1d', border: 'rgba(239, 68, 68, 1)', gradient: ['#EF4444', '#DC2626'] },
-                { bg: 'rgba(139, 92, 246, 0.95)', text: '#312e81', border: 'rgba(139, 92, 246, 1)', gradient: ['#8B5CF6', '#7C3AED'] },
-                { bg: 'rgba(6, 182, 212, 0.95)', text: '#083344', border: 'rgba(6, 182, 212, 1)', gradient: ['#06B6D4', '#0891B2'] },
-                { bg: 'rgba(34, 197, 94, 0.95)', text: '#14532d', border: 'rgba(34, 197, 94, 1)', gradient: ['#22C55E', '#16A34A'] },
-                { bg: 'rgba(249, 115, 22, 0.95)', text: '#431407', border: 'rgba(249, 115, 22, 1)', gradient: ['#F97316', '#EA580C'] },
-                { bg: 'rgba(168, 85, 247, 0.95)', text: '#3b0764', border: 'rgba(168, 85, 247, 1)', gradient: ['#A855F7', '#9333EA'] }
-            ]
-        };
-        
-        // 初始化
-        function init() {
-            optimizeViewport();
-            handleScreenOrientation();
-            showLandscapeHint();
-            setupCanvas();
-            setupPhysics();
-            setupEventListeners();
-            startGameLoop();
+        window.onload = function() {
+            // DOM元素引用
+            const canvas = document.getElementById('physicsCanvas');
+            const ctx = canvas.getContext('2d');
+            const textInput = document.getElementById('textInput');
+            const addTextBtn = document.getElementById('addText');
+            const startVoiceBtn = document.getElementById('startVoice');
+            const voiceDot = document.getElementById('voiceDot');
+            const launchRandomBtn = document.getElementById('launchRandom');
+            const toggleGravityBtn = document.getElementById('toggleGravity');
+            const toggleVortexBtn = document.getElementById('toggleVortex');
+
+            const clearAllBtn = document.getElementById('clearAll');
+            const vortexVisual = document.getElementById('vortexVisual');
+            const launcherVisual = document.getElementById('launcherVisual');
+            const statusMessage = document.getElementById('statusMessage');
+            const statusText = document.getElementById('statusText');
             
-            showStatus('系统已就绪');
-        }
-        
-        // 显示横屏提示
-        function showLandscapeHint() {
-            if (!isMobileDevice) return;
-            
-            // 检查当前方向
-            const checkOrientation = () => {
-                const isPortrait = window.innerHeight > window.innerWidth;
-                const hint = document.getElementById('landscapeHint');
-                
-                if (isPortrait) {
-                    if (!hint) {
-                        const hintDiv = document.createElement('div');
-                        hintDiv.id = 'landscapeHint';
-                        hintDiv.className = 'landscape-hint';
-                        hintDiv.innerHTML = `
-                            <div style="font-size: 1.2rem; margin-bottom: 0.5rem;">📱</div>
-                            <div>请将设备旋转至横屏模式</div>
-                            <div style="font-size: 0.75rem; margin-top: 0.5rem; opacity: 0.8;">
-                                以获得最佳体验
-                            </div>
-                        `;
-                        document.body.appendChild(hintDiv);
-                    }
-                } else {
-                    if (hint) {
-                        hint.remove();
-                    }
+            // ===== 系统可调参数配置 =====
+            const CONFIG = {
+                // 物理参数
+                physics: {
+                    gravity: 0.8,           // 重力大小
+                    timeScale: 1,           // 时间缩放
+                    fps: 60                 // 帧率
+                },
+                // 漩涡参数
+                vortex: {
+                    strength: 0.005,        // 漩涡力度
+                    captureRadius: 50,      // 捕获半径
+                    rotationForce: 0.0005,  // 旋转力
+                    xPosition: 0.85,        // 水平位置(0-1) - 更靠右的位置
+                    yPosition: 0.4          // 垂直位置(0-1) - 稍靠上的位置
+                },
+                // 方块参数
+                block: {
+                    size: 40,               // 方块大小
+                    gap: 5,                 // 方块间隙
+                    restitution: 0.6,       // 弹性
+                    friction: 0.1,          // 摩擦力
+                    frictionAir: 0.03,      // 空气阻力
+                    density: 0.04,          // 密度
+                    showBlocks: false       // 是否显示方块背景
+                },
+                // 发射参数
+                launcher: {
+                    x: 100,                 // 发射器X位置
+                    y: 150,                 // 发射器Y位置
+                    baseForce: 10,          // 基础发射力
+                    forceVariation: 3,      // 力度变化范围
+                    angleRange: 60          // 角度范围(±30度)
+                },
+                // 关节参数
+                joint: {
+                    stiffness: 0.1,         // 刚度
+                    damping: 0.1            // 阻尼
+                },
+                // 语音参数
+                speech: {
+                    lang: 'zh-CN',          // 语言
+                    volume: 1,              // 音量
+                    rate: 1,                // 语速
+                    pitch: 1                // 音调
                 }
             };
             
-            // 初始检查
-            checkOrientation();
+            // 方块显示状态 - 使用配置参数
+            let showBlocks = CONFIG.block.showBlocks;
             
-            // 监听方向变化
-            window.addEventListener('resize', checkOrientation);
-            window.addEventListener('orientationchange', checkOrientation);
-        }
-        
-        // 处理屏幕方向
-        function handleScreenOrientation() {
-            if (!isMobileDevice) return;
-            
-            // 监听屏幕方向变化
-            window.addEventListener('orientationchange', handleOrientationChange);
-            window.addEventListener('resize', handleOrientationChange);
-            
-            // 强制横屏
-            lockLandscape();
-            
-            // 初始化陀螺仪
-            initGyroscope();
-        }
-        
-        // 强制横屏模式
-        function lockLandscape() {
-            if (!isMobileDevice) return;
-            
-            // 延迟执行，确保页面加载完成
-            setTimeout(() => {
-                try {
-                    // 检测当前方向
-                    const isPortrait = window.innerHeight > window.innerWidth;
-                    
-                    if (isPortrait) {
-                        // 尝试多种API方式
-                        const lockPromises = [];
-                        
-                        // 标准API
-                        if (screen.orientation && screen.orientation.lock) {
-                            lockPromises.push(
-                                screen.orientation.lock('landscape-primary')
-                                    .catch(() => screen.orientation.lock('landscape'))
-                            );
-                        }
-                        
-                        // 旧版API
-                        if (screen.lockOrientation) {
-                            screen.lockOrientation('landscape-primary');
-                        } else if (screen.webkitLockOrientation) {
-                            screen.webkitLockOrientation('landscape-primary');
-                        } else if (screen.mozLockOrientation) {
-                            screen.mozLockOrientation('landscape-primary');
-                        }
-                        
-                        // 等待API结果
-                        Promise.allSettled(lockPromises).then(results => {
-                            const success = results.some(r => r.status === 'fulfilled');
-                            if (!success) {
-                                console.log('API锁定失败，启用CSS替代');
-                                forceLandscapeCSS();
-                            }
-                        });
-                        
-                        // 如果API都不支持，直接使用CSS
-                        if (lockPromises.length === 0) {
-                            forceLandscapeCSS();
-                        }
-                    }
-                } catch (e) {
-                    console.log('屏幕方向API错误，使用CSS替代:', e);
-                    forceLandscapeCSS();
-                }
-            }, 500);
-        }
-        
-        // CSS强制横屏 - 修复横屏显示问题
-        function forceLandscapeCSS() {
-            if (!isMobileDevice) return;
-            
-            const style = document.createElement('style');
-            style.id = 'landscape-force';
-            style.textContent = `
-                /* 横屏优化 - 修复手机横屏显示问题 */
-                @media screen and (orientation: portrait) and (max-width: 768px) {
-                    html, body {
-                        margin: 0;
-                        padding: 0;
-                        height: 100vh;
-                        width: 100vw;
-                        overflow: hidden;
-                        position: fixed;
-                        background: #f8f9fa;
-                    }
-                    
-                    /* 使用viewport单位直接设置横屏尺寸，避免transform旋转 */
-                    .app-container {
-                        position: fixed;
-                        top: 0;
-                        left: 0;
-                        width: 100vh;
-                        height: 100vw;
-                        margin: 0;
-                        border-radius: 0;
-                        box-shadow: none;
-                        display: flex;
-                        flex-direction: column;
-                        overflow: hidden;
-                        transform: none; /* 移除transform旋转 */
-                    }
-                    
-                    .canvas-container {
-                        margin: 0;
-                        border-radius: 0;
-                        box-shadow: none;
-                        flex: 1;
-                        min-height: 0;
-                        width: 100%;
-                        height: calc(100vw - 80px);
-                        overflow: hidden;
-                    }
-                    
-                    .bottom-controls {
-                        position: relative;
-                        border-radius: 0;
-                        height: 80px;
-                        padding: 0.5rem;
-                        flex-shrink: 0;
-                        background: white;
-                        border-top: 1px solid #e5e7eb;
-                    }
-                    
-                    /* 适配不同屏幕尺寸 */
-                    @media (max-height: 600px) {
-                        .bottom-controls {
-                            height: 70px;
-                        }
-                        .canvas-container {
-                            height: calc(100vw - 70px);
-                        }
-                    }
-                    
-                    @media (max-height: 480px) {
-                        .bottom-controls {
-                            height: 60px;
-                            padding: 0.25rem;
-                        }
-                        .canvas-container {
-                            height: calc(100vw - 60px);
-                        }
-                    }
-                    
-                    /* 横屏提示 - 移除旋转 */
-                    .landscape-hint {
-                        position: fixed;
-                        top: 50%;
-                        left: 50%;
-                        transform: translate(-50%, -50%);
-                        background: rgba(0, 0, 0, 0.9);
-                        color: white;
-                        padding: 1.5rem;
-                        border-radius: 0.75rem;
-                        font-size: 1rem;
-                        z-index: 9999;
-                        text-align: center;
-                        pointer-events: none;
-                        min-width: 200px;
-                        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-                        backdrop-filter: blur(10px);
-                    }
-                }
+            // 显示状态消息的函数
+            function showStatus(message, isError = false) {
+                statusText.textContent = message;
+                statusMessage.classList.remove('hidden', 'bg-blue-50', 'text-blue-700', 'bg-red-50', 'text-red-700');
                 
-                /* 横屏模式优化 - 使用orientation: landscape */
-                @media screen and (orientation: landscape) {
-                    html, body {
-                        margin: 0;
-                        padding: 0;
-                        height: 100vh;
-                        width: 100vw;
-                        overflow: hidden;
-                        position: fixed;
-                        background: #f8f9fa;
-                    }
-                    
-                    .app-container {
-                        border-radius: 0;
-                        margin: 0;
-                        height: 100vh;
-                        width: 100vw;
-                        display: flex;
-                        flex-direction: column;
-                        position: absolute;
-                        top: 0;
-                        left: 0;
-                        overflow: hidden;
-                    }
-                    
-                    .canvas-container {
-                        border-radius: 0;
-                        margin: 0;
-                        flex: 1;
-                        min-height: 0;
-                        width: 100%;
-                        height: calc(100vh - 80px);
-                        overflow: hidden;
-                    }
-                    
-                    .bottom-controls {
-                        position: relative;
-                        border-radius: 0;
-                        height: 80px;
-                        flex-shrink: 0;
-                        background: white;
-                        border-top: 1px solid #e5e7eb;
-                    }
-                    
-                    /* 适配不同屏幕尺寸 */
-                    @media (max-height: 600px) {
-                        .bottom-controls {
-                            height: 70px;
-                        }
-                        .canvas-container {
-                            height: calc(100vh - 70px);
-                        }
-                    }
-                    
-                    @media (max-height: 480px) {
-                        .bottom-controls {
-                            height: 60px;
-                            padding: 0.25rem;
-                        }
-                        .canvas-container {
-                            height: calc(100vh - 60px);
-                        }
-                    }
-                }
-                
-                /* 横屏设备检测 - 更精确的媒体查询 */
-                @media screen and (min-aspect-ratio: 13/9) {
-                    .app-container {
-                        border-radius: 0;
-                        margin: 0;
-                    }
-                }
-                
-                /* 超宽屏横屏优化 */
-                @media screen and (min-aspect-ratio: 2/1) {
-                    .canvas-container {
-                        height: calc(100vh - 60px);
-                    }
-                    .bottom-controls {
-                        height: 60px;
-                    }
-                }
-                
-                /* 横屏手机专用媒体查询 */
-                @media screen and (orientation: landscape) and (max-height: 500px) {
-                    .canvas-container {
-                        height: calc(100vh - 50px);
-                    }
-                    .bottom-controls {
-                        height: 50px;
-                        padding: 0.25rem;
-                    }
-                }
-                
-                /* 修复触摸坐标的CSS变量 */
-                :root {
-                    --touch-offset-x: 0px;
-                    --touch-offset-y: 0px;
-                }
-                
-                /* 强制横屏模式下的触摸修复 */
-                @media screen and (orientation: portrait) and (max-width: 768px) {
-                    canvas {
-                        touch-action: none;
-                        -webkit-user-select: none;
-                        user-select: none;
-                    }
-                }
-                
-                /* 全屏模式优化 */
-                :-webkit-full-screen .app-container,
-                :-moz-full-screen .app-container,
-                :fullscreen .app-container {
-                    border-radius: 0;
-                    margin: 0;
-                }
-            `;
-            document.head.appendChild(style);
-        }
-        
-        // 处理方向变化
-        function handleOrientationChange() {
-            setTimeout(() => {
-                setupCanvas();
-                setupPhysics();
-                // 强制重新计算布局
-                window.dispatchEvent(new Event('resize'));
-            }, 100);
-        }
-        
-        // 优化viewport设置
-        function optimizeViewport() {
-            const viewport = document.querySelector('meta[name="viewport"]');
-            if (viewport) {
-                viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover');
-            }
-        }
-        
-        // 初始化陀螺仪
-        function initGyroscope() {
-            if (!isMobileDevice) {
-                showStatus('陀螺仪仅支持移动设备');
-                return;
-            }
-            
-            // 检查设备是否支持陀螺仪
-            if (window.DeviceOrientationEvent) {
-                // iOS 13+ 需要用户授权
-                if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-                    showStatus('正在请求陀螺仪权限...');
-                    
-                    DeviceOrientationEvent.requestPermission()
-                        .then(response => {
-                            if (response === 'granted') {
-                                enableGyroscope();
-                                showGyroscopeFeedback('陀螺仪已启用');
-                            } else {
-                                showStatus('陀螺仪权限被拒绝');
-                                showGyroscopeFeedback('权限被拒绝');
-                            }
-                        })
-                        .catch(error => {
-                            console.error('陀螺仪权限请求失败:', error);
-                            showStatus('陀螺仪初始化失败');
-                            showGyroscopeFeedback('初始化失败');
-                        });
+                if (isError) {
+                    statusMessage.classList.add('bg-red-50', 'text-red-700');
                 } else {
-                    // Android 或其他支持设备
-                    enableGyroscope();
-                    showGyroscopeFeedback('陀螺仪已启用');
+                    statusMessage.classList.add('bg-blue-50', 'text-blue-700');
                 }
-            } else {
-                console.log('设备不支持陀螺仪');
-                showStatus('设备不支持陀螺仪');
-                showGyroscopeFeedback('设备不支持');
-            }
-        }
-        
-        // 启用陀螺仪监听
-        function enableGyroscope() {
-            window.addEventListener('deviceorientation', handleDeviceOrientation);
-            gyroscopeActive = true;
-            showStatus('陀螺仪已启用');
-            console.log('陀螺仪监听已启动');
-        }
-        
-        // 处理设备方向数据
-        function handleDeviceOrientation(event) {
-            if (!gyroscopeActive || !event) return;
-            
-            // 获取陀螺仪数据
-            deviceOrientation.alpha = event.alpha || 0; // 水平旋转
-            deviceOrientation.beta = event.beta || 0;   // 前后倾斜 (-180 to 180)
-            deviceOrientation.gamma = event.gamma || 0; // 左右倾斜 (-90 to 90)
-            
-            // 根据倾斜角度调整重力方向
-            if (gravityActive) {
-                updateGravityFromOrientation();
-            }
-        }
-        
-        // 根据设备方向更新重力
-        function updateGravityFromOrientation() {
-            const { beta, gamma, alpha } = deviceOrientation;
-            
-            // 高级陀螺仪处理
-            const smoothing = 0.15; // 平滑系数
-            const deadZone = 2; // 死区角度，减少微小抖动
-            const maxAngle = 35; // 最大有效角度，更自然
-            const baseGravity = isMobileDevice ? CONFIG.physics.mobileGravity : CONFIG.physics.gravity;
-            
-            // 计算相对倾斜角度（相对于水平面）
-            const tiltX = gamma; // 左右倾斜
-            const tiltY = beta - 90; // 前后倾斜（调整为0度为水平）
-            
-            // 应用死区和限制
-            const clampedTiltX = Math.abs(tiltX) > deadZone ? 
-                Math.max(-maxAngle, Math.min(maxAngle, tiltX)) : 0;
-            
-            const clampedTiltY = Math.abs(tiltY) > deadZone ? 
-                Math.max(-maxAngle, Math.min(maxAngle, tiltY)) : 0;
-            
-            // 平滑重力变化
-            const targetGravityX = -clampedTiltX * 0.025;
-            const targetGravityY = clampedTiltY * 0.025 + baseGravity;
-            
-            // 平滑过渡
-            world.gravity.x = world.gravity.x + (targetGravityX - world.gravity.x) * smoothing;
-            world.gravity.y = world.gravity.y + (targetGravityY - world.gravity.y) * smoothing;
-            
-            // 限制重力范围
-            const maxGravity = baseGravity * 1.8;
-            world.gravity.x = Math.max(-maxGravity * 0.8, Math.min(maxGravity * 0.8, world.gravity.x));
-            world.gravity.y = Math.max(baseGravity * 0.3, Math.min(maxGravity, world.gravity.y));
-            
-            // 添加旋转效果（可选）
-            if (gyroscopeActive) {
-                updateVisualTiltEffect(clampedTiltX, clampedTiltY);
-            }
-        }
-        
-        // 视觉倾斜效果
-        function updateVisualTiltEffect(tiltX, tiltY) {
-            const vortex = document.getElementById('vortexVisual');
-            const launcher = document.getElementById('launcherVisual');
-            
-            // 轻微倾斜视觉元素，提供反馈
-            const maxTiltEffect = 5; // 最大视觉倾斜角度
-            const scaleX = 1 + (tiltX / 90) * 0.1;
-            const scaleY = 1 + (tiltY / 90) * 0.1;
-            
-            if (vortex) {
-                vortex.style.transform = `scale(${scaleX}, ${scaleY}) rotate(${tiltX * 0.5}deg)`;
-            }
-            if (launcher) {
-                launcher.style.transform = `scale(${scaleX}, ${scaleY}) rotate(${tiltY * 0.5}deg)`;
-            }
-        }
-        
-        // 陀螺仪反馈提示
-        function showGyroscopeFeedback(message) {
-            const feedback = document.createElement('div');
-            feedback.id = 'gyroscopeFeedback';
-            feedback.style.cssText = `
-                position: fixed;
-                top: 50px;
-                left: 50%;
-                transform: translateX(-50%);
-                background: rgba(0, 0, 0, 0.8);
-                color: white;
-                padding: 10px 20px;
-                border-radius: 20px;
-                font-size: 14px;
-                z-index: 1000;
-                animation: fadeInOut 2s ease-in-out;
-                pointer-events: none;
-            `;
-            
-            // 添加淡入淡出动画
-            const style = document.createElement('style');
-            style.textContent = `
-                @keyframes fadeInOut {
-                    0% { opacity: 0; transform: translateX(-50%) translateY(-10px); }
-                    20% { opacity: 1; transform: translateX(-50%) translateY(0); }
-                    80% { opacity: 1; transform: translateX(-50%) translateY(0); }
-                    100% { opacity: 0; transform: translateX(-50%) translateY(-10px); }
-                }
-            `;
-            document.head.appendChild(style);
-            
-            feedback.textContent = message;
-            document.body.appendChild(feedback);
-            
-            setTimeout(() => {
-                if (feedback.parentNode) {
-                    feedback.parentNode.removeChild(feedback);
-                }
-                if (style.parentNode) {
-                    style.parentNode.removeChild(style);
-                }
-            }, 2000);
-        }
-        
-        // 切换陀螺仪状态
-        function toggleGyroscope() {
-            if (!isMobileDevice) {
-                showStatus('仅支持移动设备');
-                showGyroscopeFeedback('仅支持移动设备');
-                return;
-            }
-            
-            gyroscopeActive = !gyroscopeActive;
-            
-            if (gyroscopeActive) {
-                initGyroscope();
-            } else {
-                window.removeEventListener('deviceorientation', handleDeviceOrientation);
                 
-                // 恢复默认重力
-                world.gravity.x = 0;
-                world.gravity.y = isMobileDevice ? CONFIG.physics.mobileGravity : CONFIG.physics.gravity;
-                
-                showStatus('陀螺仪已关闭');
-                showGyroscopeFeedback('陀螺仪已关闭');
-                
-                // 重置视觉倾斜效果
-                updateVisualTiltEffect(0, 0);
-            }
-        }
-        
-        // 设置画布
-        function setupCanvas() {
-            canvas = document.getElementById('physicsCanvas');
-            ctx = canvas.getContext('2d');
-            
-            const resizeCanvas = () => {
-                const container = canvas.parentElement;
-                const rect = container.getBoundingClientRect();
-                const dpr = window.devicePixelRatio || 1;
-                
-                // 确保画布尺寸是整数，避免亚像素问题
-                canvas.width = Math.floor(rect.width * dpr);
-                canvas.height = Math.floor(rect.height * dpr);
-                canvas.style.width = rect.width + 'px';
-                canvas.style.height = rect.height + 'px';
-                
-                ctx.scale(dpr, dpr);
-                
-                // 更新视觉元素位置
-                const vortexVisual = document.getElementById('vortexVisual');
-                const launcherVisual = document.getElementById('launcherVisual');
-                
-                vortexVisual.style.left = (rect.width * CONFIG.vortex.xPosition - 24) + 'px';
-                vortexVisual.style.top = (rect.height * 0.5 - 24) + 'px';
-                
-                launcherVisual.style.left = (CONFIG.launcher.x - 20) + 'px';
-                launcherVisual.style.top = (CONFIG.launcher.y - 20) + 'px';
-                
-                // 更新墙体位置 - 延迟执行确保尺寸稳定
                 setTimeout(() => {
-                    if (world) {
-                        updateWalls();
-                    }
-                }, 100);
-            };
-            
-            // 确保触摸事件能正确获取坐标
-            canvas.style.touchAction = 'none';
-            
-            resizeCanvas();
-            window.addEventListener('resize', resizeCanvas);
-        }
-        
-        // 墙体边界
-        let walls = [];
-        
-        // 创建/更新墙体
-        function updateWalls() {
-            const { World, Bodies } = Matter;
-            
-            // 移除旧墙体
-            if (walls.length > 0) {
-                World.remove(world, walls);
-                walls = [];
+                    statusMessage.classList.add('hidden');
+                }, 3000);
             }
             
-            // 获取实际显示尺寸（直接使用getBoundingClientRect）
-            const container = canvas.parentElement;
-            const rect = container.getBoundingClientRect();
-            
-            // 使用实际显示尺寸，避免DPR计算误差
-            const displayWidth = rect.width;
-            const displayHeight = rect.height;
-            
-            // 移动端专用墙体参数
-            const isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i.test(navigator.userAgent);
-            const wallThickness = isMobile ? 100 : 60; // 移动端使用更厚墙体
-            const extraMargin = isMobile ? 50 : 20; // 移动端额外边距
-            
-            const wallOptions = {
-                isStatic: true,
-                friction: 1.0, // 最大摩擦力
-                restitution: 0.01, // 最小弹性，防止穿透
-                collisionFilter: {
-                    group: -1,
-                    category: 0x0002,
-                    mask: 0xFFFFFFFF
-                }
-            };
-            
-            // 创建超大墙体，确保完全覆盖边界
-            const ground = Bodies.rectangle(
-                displayWidth / 2, 
-                displayHeight + wallThickness / 2, 
-                displayWidth + wallThickness * 4, 
-                wallThickness, 
-                wallOptions
-            );
-            
-            const ceiling = Bodies.rectangle(
-                displayWidth / 2, 
-                -wallThickness / 2, 
-                displayWidth + wallThickness * 4, 
-                wallThickness, 
-                wallOptions
-            );
-            
-            const leftWall = Bodies.rectangle(
-                -wallThickness / 2, 
-                displayHeight / 2, 
-                wallThickness, 
-                displayHeight + wallThickness * 4, 
-                wallOptions
-            );
-            
-            const rightWall = Bodies.rectangle(
-                displayWidth + wallThickness / 2, 
-                displayHeight / 2, 
-                wallThickness, 
-                displayHeight + wallThickness * 4, 
-                wallOptions
-            );
-            
-            walls = [ground, ceiling, leftWall, rightWall];
-            World.add(world, walls);
-            
-            // 验证墙体位置
-            console.log('墙体更新完成:', {
-                isMobile,
-                displaySize: { width: displayWidth, height: displayHeight },
-                wallThickness,
-                groundPos: ground.position,
-                leftWallPos: leftWall.position,
-                rightWallPos: rightWall.position
-            });
-        }
-        
-        // 设置物理引擎
-        function setupPhysics() {
+            // 物理引擎初始化
             const { Engine, World, Bodies, Body, Constraint, Mouse, MouseConstraint } = Matter;
             
-            engine = Engine.create({
+            // 创建引擎 - 使用配置参数
+            const engine = Engine.create({
                 timing: {
                     timeScale: CONFIG.physics.timeScale,
-                    delta: 1000 / CONFIG.physics.fps
-                },
-                // 增强碰撞检测精度
-                positionIterations: 6,
-                velocityIterations: 4,
-                constraintIterations: 2
+                    delta: 1000 / CONFIG.physics.fps // 根据fps计算delta
+                }
             });
-            world = engine.world;
+            engine.world.gravity.y = CONFIG.physics.gravity;
             
-            world.gravity.y = isMobileDevice ? CONFIG.physics.mobileGravity : CONFIG.physics.gravity;
+            // 初始化Canvas尺寸，考虑设备像素比
+            function initialResizeCanvas() {
+                const container = canvas.parentElement;
+                const dpr = window.devicePixelRatio || 1;
+                const rect = container.getBoundingClientRect();
+                
+                canvas.width = rect.width * dpr;
+                canvas.height = 600 * dpr;
+                canvas.style.width = `${rect.width}px`;
+                canvas.style.height = '600px';
+                
+                // 调整上下文缩放
+                ctx.scale(dpr, dpr);
+                
+                // 定位视觉元素 - 使用配置参数定位漩涡
+                vortexVisual.style.left = `${rect.width * CONFIG.vortex.xPosition - 32}px`; // 使用配置的水平位置
+                vortexVisual.style.top = `${600 * CONFIG.vortex.yPosition - 32}px`; // 使用配置的垂直位置
+                
+                // 增强漩涡视觉效果
+                vortexVisual.style.boxShadow = `
+                    0 0 20px rgba(139, 92, 246, 0.8), 
+                    0 0 40px rgba(139, 92, 246, 0.6), 
+                    0 0 60px rgba(139, 92, 246, 0.4),
+                    0 0 80px rgba(139, 92, 246, 0.2)
+                `;
+                
+                // 发射器位置上移
+                launcherVisual.style.left = '30px';
+                launcherVisual.style.top = `150px`;
+            }
             
-            // 设置边界容差为0，确保精确边界检测
-            world.bounds = {
-                min: { x: -Infinity, y: -Infinity },
-                max: { x: Infinity, y: Infinity }
+            initialResizeCanvas();
+            
+            // 创建世界边界
+            const ground = Bodies.rectangle(canvas.width / (2 * window.devicePixelRatio || 1), 
+                                           600 - 10, 
+                                           canvas.width / (window.devicePixelRatio || 1), 
+                                           20, 
+                                           { isStatic: true });
+            const ceiling = Bodies.rectangle(canvas.width / (2 * window.devicePixelRatio || 1), 
+                                            10, 
+                                            canvas.width / (window.devicePixelRatio || 1), 
+                                            20, 
+                                            { isStatic: true });
+            const leftWall = Bodies.rectangle(10, 
+                                             300, 
+                                             20, 
+                                             600, 
+                                             { isStatic: true });
+            const rightWall = Bodies.rectangle(canvas.width / (window.devicePixelRatio || 1) - 10, 
+                                              300, 
+                                              20, 
+                                              600, 
+                                              { isStatic: true });
+            
+            // 漩涡设置 - 使用配置参数
+            const dpr = window.devicePixelRatio || 1;
+            const vortexCenter = { 
+                x: (canvas.width / dpr) * CONFIG.vortex.xPosition,
+                y: 600 * CONFIG.vortex.yPosition  // 使用相对位置
+            };
+            const vortexStrength = CONFIG.vortex.strength;
+            let vortexActive = true;
+            
+            // 发射器位置 - 使用配置参数
+            const launcherPosition = { 
+                x: CONFIG.launcher.x, 
+                y: CONFIG.launcher.y 
             };
             
-            // 创建初始墙体
-            updateWalls();
+            // 存储文字方块组
+            let characterGroups = [];
             
-            // 鼠标/触摸控制
+            // 颜色库
+            const colors = [
+                { bg: 'rgba(59, 130, 246, 0.95)', text: 'white', border: 'rgba(59, 130, 246, 1)' },
+                { bg: 'rgba(16, 185, 129, 0.95)', text: 'white', border: 'rgba(16, 185, 129, 1)' },
+                { bg: 'rgba(236, 72, 153, 0.95)', text: 'white', border: 'rgba(236, 72, 153, 1)' },
+                { bg: 'rgba(245, 158, 11, 0.95)', text: 'white', border: 'rgba(245, 158, 11, 1)' },
+                { bg: 'rgba(239, 68, 68, 0.95)', text: 'white', border: 'rgba(239, 68, 68, 1)' },
+                { bg: 'rgba(139, 92, 246, 0.95)', text: 'white', border: 'rgba(139, 92, 246, 1)' }
+            ];
+            
+            // 随机词语库
+            const randomWords = [
+                '天', '地', '日', '月', '山', '水', '风', '云',
+                '春', '夏', '秋', '冬', '花', '鸟', '树', '木'
+            ];
+            
+            // 添加边界到世界
+            World.add(engine.world, [ground, ceiling, leftWall, rightWall]);
+            
+            // 鼠标交互
             const mouse = Mouse.create(canvas);
-            const touchControl = {
-                element: canvas,
-                target: null,
-                startX: 0,
-                startY: 0
-            };
-            
-            // 鼠标控制 - 优化鼠标拖动
             const mouseConstraint = MouseConstraint.create(engine, {
                 mouse: mouse,
                 constraint: {
-                    stiffness: 0.8, // 增加刚度，让拖动更精确
-                    render: { visible: false },
-                    damping: 0.1, // 减少阻尼，响应更快
-                    angularStiffness: 0.5 // 增加角刚度
+                    stiffness: 0.2,
+                    render: { visible: false }
                 }
             });
             
-            World.add(world, mouseConstraint);
+            World.add(engine.world, mouseConstraint);
             
-            // 优化触摸拖动体验
-            let activeTouch = null;
-            let touchOffset = { x: 0, y: 0 };
-            
-            // 横屏触摸坐标转换
-            function convertTouchCoordinates(touch, canvas) {
-                const rect = canvas.getBoundingClientRect();
-                let x = touch.clientX - rect.left;
-                let y = touch.clientY - rect.top;
+            // 调整尺寸函数
+            function resizeCanvas() {
+                const container = canvas.parentElement;
+                const dpr = window.devicePixelRatio || 1;
+                const rect = container.getBoundingClientRect();
                 
-                // 检测是否为横屏模式
-                const isLandscape = window.innerWidth > window.innerHeight;
-                const isPortraitForced = window.matchMedia('screen and (orientation: portrait) and (max-width: 768px)').matches;
+                // 保存当前鼠标比例
+                mouse.pixelRatio = dpr;
                 
-                if (isPortraitForced && !isLandscape) {
-                    // 竖屏强制横屏模式下，需要转换坐标
-                    const temp = x;
-                    x = y;
-                    y = rect.width - temp;
+                // 调整Canvas尺寸
+                canvas.width = rect.width * dpr;
+                canvas.height = 600 * dpr;
+                canvas.style.width = `${rect.width}px`;
+                canvas.style.height = '600px';
+                
+                // 重置上下文缩放
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+                ctx.scale(dpr, dpr);
+                
+                // 更新视觉元素位置
+                vortexVisual.style.left = `${rect.width * CONFIG.vortex.xPosition - 32}px`;
+                vortexVisual.style.top = `${600 * CONFIG.vortex.yPosition - 32}px`;
+                
+                // 保持增强的漩涡视觉效果
+                if (vortexActive) {
+                    vortexVisual.style.boxShadow = `
+                        0 0 20px rgba(139, 92, 246, 0.8), 
+                        0 0 40px rgba(139, 92, 246, 0.6), 
+                        0 0 60px rgba(139, 92, 246, 0.4),
+                        0 0 80px rgba(139, 92, 246, 0.2)
+                    `;
                 }
                 
-                return { x, y };
+                // 发射器保持位置
+                launcherVisual.style.left = '30px';
+                launcherVisual.style.top = '150px';
+                
+                // 更新世界边界
+                Matter.Body.setPosition(ground, { x: rect.width / 2, y: 600 - 10 });
+                Matter.Body.setSize(ground, { width: rect.width, height: 20 });
+                
+                Matter.Body.setPosition(ceiling, { x: rect.width / 2, y: 10 });
+                Matter.Body.setSize(ceiling, { width: rect.width, height: 20 });
+                
+                Matter.Body.setPosition(leftWall, { x: 10, y: 300 });
+                Matter.Body.setSize(leftWall, { width: 20, height: 600 });
+                
+                Matter.Body.setPosition(rightWall, { x: rect.width - 10, y: 300 });
+                Matter.Body.setSize(rightWall, { width: 20, height: 600 });
+                
+                // 更新漩涡中心 - 使用配置参数（考虑DPR）
+                vortexCenter.x = rect.width * CONFIG.vortex.xPosition;
+                vortexCenter.y = 600 * CONFIG.vortex.yPosition;
+                
+                // 更新发射器物理位置
+                launcherPosition.x = 50;
+                launcherPosition.y = 150;
             }
             
-            canvas.addEventListener('touchstart', (e) => {
-                e.preventDefault();
-                if (e.touches.length === 1) {
-                    const touch = e.touches[0];
-                    const mousePos = convertTouchCoordinates(touch, canvas);
-                    
-                    // 查找最近的物体
-                    const bodies = Matter.Composite.allBodies(world);
-                    let closestBody = null;
-                    let minDistance = Infinity;
-                    
-                    for (const body of bodies) {
-                        if (body.isStatic) continue;
-                        
-                        const distance = Math.sqrt(
-                            Math.pow(body.position.x - mousePos.x, 2) + 
-                            Math.pow(body.position.y - mousePos.y, 2)
-                        );
-                        
-                        // 检查是否在物体范围内（考虑物体大小）
-                        const bounds = body.bounds;
-                        const range = Math.max(bounds.max.x - bounds.min.x, bounds.max.y - bounds.min.y) / 2;
-                        
-                        if (distance < range + 20 && distance < minDistance) {
-                            closestBody = body;
-                            minDistance = distance;
-                        }
-                    }
-                    
-                    if (closestBody) {
-                        activeTouch = closestBody;
-                        touchOffset.x = mousePos.x - closestBody.position.x;
-                        touchOffset.y = mousePos.y - closestBody.position.y;
-                        
-                        // 临时增加物体的阻尼，让拖动更稳定
-                        activeTouch.originalFrictionAir = activeTouch.frictionAir;
-                        activeTouch.frictionAir = 0.9;
-                        
-                        // 暂停物理计算，避免抖动
-                        activeTouch.isSensor = true;
-                    }
-                }
-            });
-            
-            canvas.addEventListener('touchmove', (e) => {
-                e.preventDefault();
-                if (activeTouch && e.touches.length === 1) {
-                    const touch = e.touches[0];
-                    const mousePos = convertTouchCoordinates(touch, canvas);
-                    
-                    // 平滑移动到触摸位置
-                    const targetX = mousePos.x - touchOffset.x;
-                    const targetY = mousePos.y - touchOffset.y;
-                    
-                    Matter.Body.setPosition(activeTouch, {
-                        x: targetX,
-                        y: targetY
-                    });
-                    
-                    // 设置速度为0，避免惯性
-                    Matter.Body.setVelocity(activeTouch, { x: 0, y: 0 });
-                    Matter.Body.setAngularVelocity(activeTouch, 0);
-                }
-            });
-            
-            canvas.addEventListener('touchend', (e) => {
-                e.preventDefault();
-                if (activeTouch) {
-                    // 恢复原始属性
-                    activeTouch.frictionAir = activeTouch.originalFrictionAir || 0.01;
-                    activeTouch.isSensor = false;
-                    
-                    // 给物体一点初始速度，模拟释放效果
-                    Matter.Body.setVelocity(activeTouch, { x: 0, y: 0 });
-                    
-                    activeTouch = null;
-                }
-            });
-            
-            canvas.addEventListener('touchcancel', (e) => {
-                e.preventDefault();
-                if (activeTouch) {
-                    activeTouch.frictionAir = activeTouch.originalFrictionAir || 0.01;
-                    activeTouch.isSensor = false;
-                    activeTouch = null;
-                }
-            });
-        }
-        
-        // 事件监听器
-        function setupEventListeners() {
-            const textInput = document.getElementById('textInput');
-            const addTextBtn = document.getElementById('addTextBtn');
-            const voiceBtn = document.getElementById('voiceBtn');
-            const clearBtn = document.getElementById('clearBtn');
-            const gravitySwitch = document.getElementById('gravitySwitch');
-            const vortexSwitch = document.getElementById('vortexSwitch');
-            
-            // 添加文字
-            addTextBtn.addEventListener('click', () => {
-                const text = textInput.value.trim();
-                if (text) {
-                    launchText(text);
-                    textInput.value = '';
-                }
-            });
-            
-            textInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    const text = textInput.value.trim();
-                    if (text) {
-                        launchText(text);
-                        textInput.value = '';
-                    }
-                }
-            });
-            
-            // 语音输入
-            voiceBtn.addEventListener('click', toggleVoiceInput);
-            
-            // 清除所有
-            clearBtn.addEventListener('click', clearAll);
-            
-            // 开关控制
-            gravitySwitch.addEventListener('click', toggleGravity);
-            vortexSwitch.addEventListener('click', toggleVortex);
-            
-            // 陀螺仪开关
-            const gyroscopeSwitch = document.getElementById('gyroscopeSwitch');
-            gyroscopeSwitch.addEventListener('click', toggleGyroscope);
-            
-            // 防止触摸事件的默认行为
-            document.addEventListener('touchmove', (e) => {
-                if (e.target === canvas) {
-                    e.preventDefault();
-                }
-            }, { passive: false });
-        }
-        
-        // 发射文字（带黑洞效果）
-        function launchText(text) {
-            if (!text) return;
-            
-            // 初始缩放动画
-            const initialScale = 0.1;
-            const scaleDuration = 500; // 毫秒
-            const scaleStep = (1 - initialScale) / (scaleDuration / 16); // 每帧缩放步长
-            
-            const container = canvas.parentElement;
-            const rect = container.getBoundingClientRect();
-            
-            const characters = text.split('');
-            const totalWidth = characters.length * CONFIG.block.size + (characters.length - 1) * CONFIG.block.gap;
-            
-            // 移动端适配：调整发射位置和安全边距
-            const safeMargin = isMobileDevice ? 80 : 50; // 移动端更大的安全边距
-            const maxX = rect.width - safeMargin;
-            const minX = safeMargin;
-            
-            // 移动端调整发射位置，避免靠近边界
-            const launcherX = isMobileDevice ? Math.min(rect.width * 0.3, CONFIG.launcher.x) : CONFIG.launcher.x;
-            const launcherY = isMobileDevice ? Math.min(rect.height * 0.3, CONFIG.launcher.y) : CONFIG.launcher.y;
-            
-            const startX = Math.max(minX + totalWidth / 2, Math.min(maxX - totalWidth / 2, launcherX));
-            const startY = Math.max(safeMargin, Math.min(rect.height - safeMargin, launcherY));
-            
-            const color = CONFIG.colors[Math.floor(Math.random() * CONFIG.colors.length)];
-            const blocks = [];
-            const joints = [];
-            
-            characters.forEach((char, index) => {
-                const x = startX - totalWidth / 2 + index * (CONFIG.block.size + CONFIG.block.gap) + CONFIG.block.size / 2;
-                const block = Bodies.rectangle(x, startY, CONFIG.block.size * initialScale, CONFIG.block.size * initialScale, {
-                    restitution: CONFIG.block.restitution,
-                    friction: CONFIG.block.friction,
-                    frictionAir: CONFIG.block.frictionAir,
-                    density: CONFIG.block.density,
-                    collisionFilter: {
-                        group: -1, // 初始不参与碰撞
-                        category: 0x0001, // 文字块碰撞类别
-                        mask: 0x0002 // 初始只与墙体碰撞（0x0002是墙体类别）
-                    }
-                });
-                
-                // 延迟后启用碰撞
-                setTimeout(() => {
-                    Matter.Body.set(block, {
-                        collisionFilter: {
-                            group: 0,
-                            category: 0x0001, // 文字块碰撞类别
-                            mask: 0xFFFFFFFF // 启用与所有物体的碰撞
-                        }
-                    });
-                }, CONFIG.block.collisionDelay);
-                
-                // 添加缩放动画
-                let currentScale = initialScale;
-                const startTime = Date.now();
-                const scaleAnimation = () => {
-                    const elapsed = Date.now() - startTime;
-                    const progress = Math.min(elapsed / CONFIG.block.scaleDuration, 1);
-                    currentScale = initialScale + (1 - initialScale) * progress;
-                    
-                    Body.scale(block, currentScale / (currentScale - scaleStep), currentScale / (currentScale - scaleStep));
-                    
-                    if (progress < 1) {
-                        requestAnimationFrame(scaleAnimation);
-                    }
-                };
-                scaleAnimation();
-                
-                blocks.push({
-                    body: block,
-                    char: char,
-                    color: color,
-                    fontSize: calculateFontSize(char)
-                });
-                
-                World.add(world, block);
-            });
-            
-            // 创建文字方块连接（学习index.html的方式）
-            for (let i = 0; i < blocks.length - 1; i++) {
-                const joint = Matter.Constraint.create({
-                    bodyA: blocks[i].body,
-                    bodyB: blocks[i + 1].body,
-                    pointA: { x: CONFIG.block.size / 2, y: 0 },
-                    pointB: { x: -CONFIG.block.size / 2, y: 0 },
-                    length: CONFIG.block.gap,
-                    stiffness: CONFIG.joint.stiffness,
-                    damping: CONFIG.joint.damping,
-                    render: {
-                        visible: true,
-                        lineWidth: 1,
-                        strokeStyle: 'rgba(255, 255, 255, 0.2)'
-                    }
-                });
-                
-                joints.push(joint);
-                World.add(world, joint);
-            }
-            
-            // 发射 - 移动端力度适配
-            const angle = (Math.random() - 0.8) * CONFIG.launcher.angleRange * Math.PI / 180;
-            
-            // 移动端使用缩放后的力度
-            let baseForce = CONFIG.launcher.baseForce;
-            if (isMobileDevice) {
-                baseForce = Math.min(
-                    CONFIG.launcher.baseForce * CONFIG.launcher.mobileForceScale,
-                    CONFIG.launcher.mobileMaxForce
-                );
-            }
-            
-            const force = baseForce + (Math.random() - 0.5) * CONFIG.launcher.forceVariation;
-            
-            blocks.forEach(block => {
-                Matter.Body.setVelocity(block.body, {
-                    x: Math.cos(angle) * force,
-                    y: Math.sin(angle) * force
-                });
-            });
-            
-            characterGroups.push({ blocks, joints, text });
+            window.addEventListener('resize', resizeCanvas);
             
             // 发射动画
-            const launcher = document.getElementById('launcherVisual');
-            launcher.style.transform = 'scale(1.2)';
-            setTimeout(() => launcher.style.transform = 'scale(1)', 200);
-            
-            showStatus(`已发射: ${text}`);
-        }
-        
-        // 计算字体大小
-        function calculateFontSize(char) {
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            let size = CONFIG.block.size;
-            
-            while (size > 8) {
-                ctx.font = `bold ${size}px system-ui`;
-                const metrics = ctx.measureText(char);
-                if (metrics.width <= CONFIG.block.size * 0.9) break;
-                size -= 2;
+            function triggerLaunchAnimation() {
+                launcherVisual.classList.add('launch-animation');
+                setTimeout(() => {
+                    launcherVisual.classList.remove('launch-animation');
+                }, 500);
             }
             
-            return size;
-        }
-        
-        // 应用漩涡力
-        function applyVortexForces() {
-            if (!vortexActive) return;
+            // 按钮点击效果
+            function buttonClickEffect(button) {
+                button.classList.add('btn-active');
+                setTimeout(() => {
+                    button.classList.remove('btn-active');
+                }, 200);
+            }
             
-            const container = canvas.parentElement;
-            const rect = container.getBoundingClientRect();
-            const vortexX = rect.width * CONFIG.vortex.xPosition;
-            const vortexY = rect.height * 0.5;
-            
-            characterGroups.forEach(group => {
-                group.blocks.forEach(block => {
-                    const dx = vortexX - block.body.position.x;
-                    const dy = vortexY - block.body.position.y;
-                    const distance = Math.sqrt(dx * dx + dy * dy);
-                    
-                    if (distance > 0 && distance < 200) {
-                        const force = CONFIG.vortex.strength / distance;
-                        const rotationForce = CONFIG.vortex.rotationForce;
-                        const angle = Math.atan2(dy, dx) + Math.PI / 2;
-                        
-                        Matter.Body.applyForce(block.body, block.body.position, {
-                            x: (dx / distance) * force + Math.cos(angle) * rotationForce,
-                            y: (dy / distance) * force + Math.sin(angle) * rotationForce
-                        });
-                    }
-                    
-                    // 检查捕获
-                    if (distance < CONFIG.vortex.captureRadius) {
-                        removeGroup(group);
-                        speakText(group.text);
-                    }
-                });
-            });
-        }
-        
-        // 移除文字组
-        function removeGroup(group) {
-            group.blocks.forEach(block => Matter.World.remove(world, block.body));
-            group.joints.forEach(joint => Matter.World.remove(world, joint));
-            
-            const index = characterGroups.indexOf(group);
-            if (index > -1) characterGroups.splice(index, 1);
-        }
-        
-        // 清除所有
-        function clearAll() {
-            characterGroups.forEach(removeGroup);
-            showStatus('已清除所有文字');
-        }
-        
-        // Web Speech API语音识别
-        
-        // Web Speech API实现
-        async function useWebSpeechAPI() {
-            return new Promise((resolve, reject) => {
-                if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
-                    reject(new Error('浏览器不支持语音识别'));
-                    return;
-                }
-
-                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-                const recognition = new SpeechRecognition();
+            // 计算最佳字体大小以完全填充方块（无边界）
+            function calculateFontSize(char, blockSize) {
+                // 创建一个临时画布用于测量文本
+                const tempCanvas = document.createElement('canvas');
+                const tempCtx = tempCanvas.getContext('2d');
                 
+                // 可用于测量的最大尺寸（完全填充方块）
+                const maxWidth = blockSize;
+                const maxHeight = blockSize;
+                
+                // 二分法查找最佳字体大小
+                let low = 8;
+                let high = blockSize * 2; // 最大可能尺寸为方块的2倍
+                let bestSize = 8;
+                
+                while (high - low > 1) {
+                    const mid = Math.floor((low + high) / 2);
+                    tempCtx.font = `bold ${mid}px Inter, system-ui, sans-serif`;
+                    const metrics = tempCtx.measureText(char);
+                    
+                    // 获取文本实际高度
+                    const textHeight = mid * 1.1; // 调整因子以更精确匹配实际高度
+                    
+                    // 文字必须完全在方块内，不留边距
+                    if (metrics.width <= maxWidth && textHeight <= maxHeight) {
+                        bestSize = mid;
+                        low = mid;
+                    } else {
+                        high = mid;
+                    }
+                }
+                
+                return bestSize;
+            }
+            
+            // 创建文字方块组（每个方块一个文字）
+            function createCharacterBlocks(text, x, y) {
+                // 分割文字为单个字符
+                const characters = text.split('');
+                if (characters.length === 0) return null;
+                
+                // 方块参数 - 使用配置参数
+                const blockSize = CONFIG.block.size;
+                const gap = CONFIG.block.gap; // 方块之间的间隙
+                
+                // 整个组的总宽度
+                const totalWidth = characters.length * blockSize + (characters.length - 1) * gap;
+                
+                // 防止长文字卡墙 - 计算安全的发射位置
+                const minSafeX = 30 + totalWidth / 2; // 左边界安全距离
+                const maxSafeX = canvas.width / (window.devicePixelRatio || 1) - 30 - totalWidth / 2; // 右边界安全距离
+                
+                // 调整发射位置，确保不会卡墙
+                const safeX = Math.max(minSafeX, Math.min(x, maxSafeX));
+                
+                // 为整个组选择一个颜色主题
+                const color = colors[Math.floor(Math.random() * colors.length)];
+                
+                // 存储方块和关节
+                const blocks = [];
+                const joints = [];
+                
+                // 创建每个字符的方块
+                characters.forEach((char, index) => {
+                    // 计算每个方块的初始位置 - 使用安全的X坐标
+                    const blockX = safeX - totalWidth / 2 + index * (blockSize + gap) + blockSize / 2;
+                    
+                    const block = Bodies.rectangle(
+                        blockX, 
+                        y, 
+                        blockSize, 
+                        blockSize, 
+                        { 
+                            restitution: CONFIG.block.restitution,
+                            friction: CONFIG.block.friction,
+                            frictionAir: CONFIG.block.frictionAir,
+                            density: CONFIG.block.density
+                        }
+                    );
+                    
+                    // 计算适合当前字符的字体大小（完全填充方块）
+                    const fontSize = calculateFontSize(char, blockSize);
+                    
+                    // 存储方块信息
+                    blocks.push({
+                        body: block,
+                        char: char,
+                        color: color,
+                        fontSize: fontSize
+                    });
+                    
+                    World.add(engine.world, block);
+                });
+                
+                // 创建连接方块的柔性关节
+                for (let i = 0; i < blocks.length - 1; i++) {
+                    const joint = Constraint.create({
+                        bodyA: blocks[i].body,
+                        bodyB: blocks[i + 1].body,
+                        pointA: { x: blockSize / 2 + gap / 2, y: 0 },
+                        pointB: { x: -blockSize / 2 - gap / 2, y: 0 },
+                        length: 0,
+                        stiffness: CONFIG.joint.stiffness,
+                        damping: CONFIG.joint.damping
+                    });
+                    
+                    joints.push(joint);
+                    World.add(engine.world, joint);
+                }
+                
+                // 返回完整的文字方块组
+                return {
+                    blocks,
+                    joints,
+                    fullText: text
+                };
+            }
+            
+            // 发射文字方块组
+            function launchWord(text) {
+                if (!text || text.trim() === '') {
+                    showStatus('请输入文字后再发射', true);
+                    return null;
+                }
+                
+                triggerLaunchAnimation();
+                const characterGroup = createCharacterBlocks(text, launcherPosition.x, launcherPosition.y);
+                if (!characterGroup) return null;
+                
+                // 随机发射角度和力度 - 使用配置参数
+                const angle = (Math.random() * CONFIG.launcher.angleRange - CONFIG.launcher.angleRange/2) * Math.PI / 180;
+                const baseForce = CONFIG.launcher.baseForce + Math.random() * CONFIG.launcher.forceVariation;
+                
+                // 对每个方块应用发射力
+                characterGroup.blocks.forEach((block, index) => {
+                    const forceVariation = 1 + (index - (characterGroup.blocks.length - 1) / 2) * 0.1;
+                    const force = baseForce * forceVariation;
+                    
+                    Body.setVelocity(block.body, {
+                        x: Math.cos(angle) * force,
+                        y: Math.sin(angle) * force
+                    });
+                });
+                
+                // 存储文字方块组
+                characterGroups.push(characterGroup);
+                showStatus(`已发射: ${text}`);
+                return characterGroup;
+            }
+            
+            // 检查漩涡捕获
+            function checkVortexCapture() {
+                for (let i = characterGroups.length - 1; i >= 0; i--) {
+                    const group = characterGroups[i];
+                    let isCaptured = false;
+                    
+                    // 检查任何一个方块是否进入漩涡范围
+                    for (const block of group.blocks) {
+                        const dx = vortexCenter.x - block.body.position.x;
+                        const dy = vortexCenter.y - block.body.position.y;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+                        
+                        if (distance < CONFIG.vortex.captureRadius) {
+                            isCaptured = true;
+                            break;
+                        }
+                    }
+                    
+                    // 如果被吸入，移除整个组
+                    if (isCaptured) {
+                        // 移除所有方块
+                        group.blocks.forEach(block => {
+                            World.remove(engine.world, block.body);
+                        });
+                        
+                        // 移除所有关节
+                        group.joints.forEach(joint => {
+                            World.remove(engine.world, joint);
+                        });
+                        
+                        // 朗读完整文字
+                        speakText(group.fullText);
+                        
+                        // 从数组中移除
+                        characterGroups.splice(i, 1);
+                    }
+                }
+            }
+            
+            // 应用漩涡力
+            function applyVortexForces() {
+                characterGroups.forEach(group => {
+                    group.blocks.forEach(block => {
+                        const dx = vortexCenter.x - block.body.position.x;
+                        const dy = vortexCenter.y - block.body.position.y;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+                        
+                        if (distance > 0) {
+                            // 增强漩涡效果，距离越近效果越强
+                            const distanceFactor = Math.max(0, 1 - distance / (canvas.width * 0.3));
+                            const forceMagnitude = (1 / (distance + 10)) * vortexStrength * block.body.mass * (1 + distanceFactor * 2);
+                            
+                            // 添加螺旋效果
+                            const spiralAngle = Math.atan2(dy, dx) + Math.PI / 2 + distanceFactor * 0.5;
+                            const spiralForce = CONFIG.vortex.rotationForce * (1 + distanceFactor * 3);
+                            
+                            const forceX = (dx / distance) * forceMagnitude + Math.cos(spiralAngle) * spiralForce;
+                            const forceY = (dy / distance) * forceMagnitude + Math.sin(spiralAngle) * spiralForce;
+                            
+                            Body.applyForce(
+                                block.body,
+                                { x: block.body.position.x, y: block.body.position.y },
+                                { x: forceX, y: forceY }
+                            );
+                        }
+                    });
+                });
+            }
+            
+            // 语音识别功能
+            let recognition;
+            let isListening = false;
+            
+            function initSpeechRecognition() {
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                if (!SpeechRecognition) {
+                    showStatus('您的浏览器不支持语音识别，请使用Chrome浏览器', true);
+                    return null;
+                }
+                
+                recognition = new SpeechRecognition();
                 recognition.continuous = false;
                 recognition.interimResults = false;
                 recognition.lang = 'zh-CN';
                 
-                let hasResult = false;
-                
                 recognition.onresult = (event) => {
-                    hasResult = true;
                     const transcript = event.results[0][0].transcript.trim();
-                    console.log('语音识别结果:', transcript);
-                    resolve(transcript);
+                    if (transcript) {
+                        launchWord(transcript);
+                        textInput.value = transcript;
+                        showStatus(`语音识别: ${transcript}`);
+                    }
+                };
+                
+                recognition.onend = () => {
+                    if (isListening) recognition.start();
+                    else stopListening();
                 };
                 
                 recognition.onerror = (event) => {
                     console.error('语音识别错误:', event.error);
-                    let errorMsg = '语音识别失败';
-                    switch(event.error) {
-                        case 'no-speech':
-                            errorMsg = '没有检测到语音';
-                            break;
-                        case 'audio-capture':
-                            errorMsg = '无法访问麦克风';
-                            break;
-                        case 'not-allowed':
-                            errorMsg = '请允许麦克风访问权限';
-                            break;
-                        default:
-                            errorMsg = '语音识别失败: ' + event.error;
-                    }
-                    reject(new Error(errorMsg));
+                    showStatus(`语音识别错误: ${event.error}`, true);
+                    stopListening();
                 };
                 
-                recognition.onend = () => {
-                    if (!hasResult) {
-                        reject(new Error('没有识别到语音'));
-                    }
-                };
-                
-                try {
-                    recognition.start();
-                } catch (error) {
-                    reject(new Error('无法启动语音识别'));
+                return recognition;
+            }
+            
+            function startListening() {
+                if (!recognition) {
+                    recognition = initSpeechRecognition();
+                    if (!recognition) return;
                 }
-            });
-        }
-        
-        // 语音输入控制 - 直接使用Web Speech API
-        async function toggleVoiceInput() {
-            if (isListening) {
-                // 停止识别
+                
+                isListening = true;
+                startVoiceBtn.innerHTML = '<i class="fa fa-stop"></i><span>停止录音</span><span id="voiceDot" class="recording-indicator"></span>';
+                startVoiceBtn.classList.remove('bg-primary', 'hover:bg-primary/90');
+                startVoiceBtn.classList.add('bg-red-500', 'hover:bg-red-600');
+                voiceDot.classList.remove('hidden');
+                
+                recognition.start();
+                showStatus('正在聆听...');
+            }
+            
+            function stopListening() {
                 isListening = false;
-                updateVoiceButton();
-                showStatus('已停止');
-            } else {
-                // 开始语音识别
-                try {
-                    isListening = true;
-                    updateVoiceButton();
-                    showStatus('请说话...');
-                    
-                    const text = await useWebSpeechAPI();
-                    
-                    if (text) {
-                        launchText(text);
-                        document.getElementById('textInput').value = text;
-                        showStatus('识别成功');
-                    }
-                    
-                } catch (error) {
-                    console.error('语音识别错误:', error);
-                    showStatus(error.message || '语音识别失败', true);
-                } finally {
-                    isListening = false;
-                    updateVoiceButton();
-                }
+                startVoiceBtn.innerHTML = '<i class="fa fa-microphone"></i><span>语音输入</span>';
+                startVoiceBtn.classList.remove('bg-red-500', 'hover:bg-red-600');
+                startVoiceBtn.classList.add('bg-primary', 'hover:bg-primary/90');
+                voiceDot.classList.add('hidden');
+                showStatus('已停止聆听');
             }
-        }
-        
-        function updateVoiceButton() {
-            const btn = document.getElementById('voiceBtn');
-            if (isListening) {
-                btn.classList.add('recording');
-                btn.querySelector('.icon').textContent = '⏹️';
-            } else {
-                btn.classList.remove('recording');
-                btn.querySelector('.icon').textContent = '🎤';
-            }
-        }
-        
-        // 开关控制
-        function toggleGravity() {
-            gravityActive = !gravityActive;
-            world.gravity.y = gravityActive ? CONFIG.physics.gravity : 0;
             
-            const switchEl = document.getElementById('gravitySwitch');
-            switchEl.classList.toggle('active', gravityActive);
-            
-            showStatus(gravityActive ? '重力已开启' : '重力已关闭');
-        }
-
-        function toggleVortex() {
-            vortexActive = !vortexActive;
-            
-            const switchEl = document.getElementById('vortexSwitch');
-            const vortexVisual = document.getElementById('vortexVisual');
-            
-            switchEl.classList.toggle('active', vortexActive);
-            vortexVisual.style.display = vortexActive ? 'flex' : 'none';
-            
-            showStatus(vortexActive ? '漩涡已开启' : '漩涡已关闭');
-        }
-        
-        // 语音合成 - 甜美声音
-        function speakText(text) {
-            if ('speechSynthesis' in window) {
-                const utterance = new SpeechSynthesisUtterance(text);
-                utterance.lang = 'zh-CN';
-                utterance.rate = 0.85;
-                utterance.pitch = 1.2;  // 提高音调，更甜美
-                utterance.volume = 0.9;
-                
-                // 获取可用的中文女声
+            // 语音合成
+            function speakText(text) {
+                if ('speechSynthesis' in window) {
+                    const utterance = new SpeechSynthesisUtterance(text);
+                    utterance.lang = 'zh-CN';
+                    utterance.volume = 0.9;
+                    utterance.rate = 0.85;  // 稍慢语速，更温柔
+                    utterance.pitch = 1.2;  // 提高音调，更甜美
+                    
+                    // 获取可用的中文女声
                 const voices = speechSynthesis.getVoices();
                 if (voices && voices.length > 0) {
                     const chineseFemaleVoices = voices.filter(voice => 
@@ -1648,101 +730,220 @@
                         }
                     }
                 }
-                
-                speechSynthesis.speak(utterance);
+                    
+                    window.speechSynthesis.speak(utterance);
+                }
             }
-        }
-        
-        // 显示状态
-        function showStatus(message, isError = false) {
-            const statusEl = document.getElementById('statusMessage');
-            statusEl.textContent = message;
-            statusEl.style.backgroundColor = isError ? 'rgba(239, 68, 68, 0.9)' : 'rgba(0, 0, 0, 0.8)';
-            statusEl.classList.add('show');
             
-            setTimeout(() => {
-                statusEl.classList.remove('show');
-            }, 2000);
-        }
-        
-        // 颜色处理工具函数
-        function lightenColor(color, percent) {
-            // 处理十六进制颜色
-            if (color.startsWith('#')) {
-                let r = parseInt(color.slice(1, 3), 16);
-                let g = parseInt(color.slice(3, 5), 16);
-                let b = parseInt(color.slice(5, 7), 16);
-                
-                r = Math.min(255, Math.floor(r + (255 - r) * percent / 100));
-                g = Math.min(255, Math.floor(g + (255 - g) * percent / 100));
-                b = Math.min(255, Math.floor(b + (255 - b) * percent / 100));
-                
-                return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
-            }
-            return color;
-        }
-
-        // 游戏循环
-        function startGameLoop() {
-            function update() {
-                applyVortexForces();
-                Matter.Engine.update(engine);
-                
-                const container = canvas.parentElement;
-                const rect = container.getBoundingClientRect();
-                
-                ctx.clearRect(0, 0, rect.width, rect.height);
-                
-                characterGroups.forEach(group => {
-                    group.blocks.forEach(block => {
-                        const { body, char, color, fontSize } = block;
-                        
-                        ctx.save();
-                        ctx.translate(body.position.x, body.position.y);
-                        ctx.rotate(body.angle);
-                        
-                        // 绘制立体文字
-                        ctx.font = `bold ${fontSize}px system-ui`;
-                        ctx.textAlign = 'center';
-                        ctx.textBaseline = 'middle';
-                        
-                        // 底层阴影 - 营造深度
-                        ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
-                        ctx.fillText(char, 2, 2);
-                        
-                        // 中层阴影 - 增强立体感
-                        ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
-                        ctx.fillText(char, 1, 1);
-                        
-                        // 边框层 - 描边效果
-                        ctx.strokeStyle = color.border;
-                        ctx.lineWidth = 2;
-                        ctx.strokeText(char, 0, 0);
-                        
-                        // 主体文字 - 渐变填充
-                        const gradient = ctx.createLinearGradient(-fontSize/2, -fontSize/2, fontSize/2, fontSize/2);
-                        gradient.addColorStop(0, color.text);
-                        gradient.addColorStop(0.5, lightenColor(color.text, 20));
-                        gradient.addColorStop(1, color.text);
-                        ctx.fillStyle = gradient;
-                        ctx.fillText(char, 0, 0);
-                        
-                        // 高光效果 - 顶部提亮
-                        ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-                        ctx.fillText(char, -1, -1);
-                        
-                        ctx.restore();
-                    });
+            // 绑定事件
+            function bindEvents() {
+                addTextBtn.addEventListener('click', () => {
+                    buttonClickEffect(addTextBtn);
+                    const text = textInput.value.trim();
+                    if (text) {
+                        launchWord(text);
+                        textInput.value = '';
+                    } else {
+                        textInput.focus();
+                        showStatus('请输入文字内容', true);
+                    }
                 });
                 
-                requestAnimationFrame(update);
+                textInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        const text = textInput.value.trim();
+                        if (text) {
+                            launchWord(text);
+                            textInput.value = '';
+                        }
+                    }
+                });
+                
+                startVoiceBtn.addEventListener('click', () => {
+                    buttonClickEffect(startVoiceBtn);
+                    if (isListening) {
+                        recognition.stop();
+                        stopListening();
+                    } else {
+                        startListening();
+                    }
+                });
+                
+                launchRandomBtn.addEventListener('click', () => {
+                    buttonClickEffect(launchRandomBtn);
+                    const randomWord = randomWords[Math.floor(Math.random() * randomWords.length)];
+                    launchWord(randomWord);
+                    textInput.value = randomWord;
+                });
+                
+                toggleGravityBtn.addEventListener('click', () => {
+                    buttonClickEffect(toggleGravityBtn);
+                    engine.world.gravity.y = engine.world.gravity.y === 0 ? 0.8 : 0;
+                    const status = engine.world.gravity.y === 0 ? '关' : '开';
+                    toggleGravityBtn.innerHTML = `<i class="fa fa-moon-o"></i><span>重力: ${status}</span>`;
+                    showStatus(`重力已${status}`);
+                });
+                
+                toggleVortexBtn.addEventListener('click', () => {
+                    buttonClickEffect(toggleVortexBtn);
+                    vortexActive = !vortexActive;
+                    const status = vortexActive ? '开' : '关';
+                    toggleVortexBtn.innerHTML = `<i class="fa fa-sync"></i><span>漩涡: ${status}</span>`;
+                    
+                    if (vortexActive) {
+                        vortexVisual.classList.add('animate-spin');
+                        vortexVisual.style.boxShadow = '0 0 40px rgba(139, 92, 246, 0.8), 0 0 80px rgba(139, 92, 246, 0.5), 0 0 120px rgba(139, 92, 246, 0.3)';
+                    } else {
+                        vortexVisual.classList.remove('animate-spin');
+                        vortexVisual.style.boxShadow = '0 0 20px rgba(139, 92, 246, 0.4)';
+                    }
+                    
+                    showStatus(`漩涡已${status}`);
+                });
+                
+                clearAllBtn.addEventListener('click', () => {
+                    buttonClickEffect(clearAllBtn);
+                    characterGroups.forEach(group => {
+                        group.blocks.forEach(block => World.remove(engine.world, block.body));
+                        group.joints.forEach(joint => World.remove(engine.world, joint));
+                    });
+                    
+                    characterGroups = [];
+                    window.speechSynthesis.cancel();
+                    showStatus('已清除所有文字');
+                });
+                
+
+                
+                showStatus('系统已就绪，可开始使用');
             }
             
-            update();
-        }
-        
-        // 启动应用
-        init();
+            // 绘制每个方块及其文字（完全填充）
+            function drawCharacterBlocks(group) {
+                group.blocks.forEach(block => {
+                    const body = block.body;
+                    
+                    ctx.save();
+                    // 平移到方块位置
+                    ctx.translate(body.position.x, body.position.y);
+                    // 旋转以匹配方块角度
+                    ctx.rotate(body.angle);
+                    
+                    // 绘制方块（如果显示方块）
+                    const size = 40;
+                    if (showBlocks) {
+                        ctx.beginPath();
+                        ctx.fillStyle = block.color.bg;
+                        ctx.strokeStyle = block.color.border;
+                        ctx.lineWidth = 2;
+                        
+                        // 绘制圆角矩形
+                        const radius = 6;
+                        const x = -size / 2;
+                        const y = -size / 2;
+                        
+                        ctx.moveTo(x + radius, y);
+                        ctx.arcTo(x + size, y, x + size, y + size, radius);
+                        ctx.arcTo(x + size, y + size, x, y + size, radius);
+                        ctx.arcTo(x, y + size, x, y, radius);
+                        ctx.arcTo(x, y, x + size, y, radius);
+                        ctx.closePath();
+                        
+                        ctx.fill();
+                        ctx.stroke();
+                    }
+                    
+                    // 在方块中心绘制文字（完全填充，无边界）
+                    // 根据方块显示状态调整文字颜色
+                    const textColor = showBlocks ? block.color.text : block.color.border;
+                    
+                    // 设置阴影效果
+                    ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+                    ctx.shadowBlur = 4;
+                    ctx.shadowOffsetX = 2;
+                    ctx.shadowOffsetY = 2;
+                    
+                    // 使用计算好的字体大小
+                    ctx.font = `bold ${block.fontSize}px Inter, system-ui, sans-serif`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    
+                    // 绘制文字描边增强立体感
+                    ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
+                    ctx.lineWidth = 2;
+                    ctx.lineJoin = 'round';
+                    ctx.strokeText(block.char, 0, 1);
+                    
+                    // 绘制文字主体
+                    ctx.fillStyle = textColor;
+                    ctx.fillText(block.char, 0, 1);
+                    
+                    // 添加立体效果的亮边
+                    ctx.shadowColor = 'rgba(255, 255, 255, 0.5)';
+                    ctx.shadowBlur = 2;
+                    ctx.shadowOffsetX = -1;
+                    ctx.shadowOffsetY = -1;
+                    ctx.fillText(block.char, 0, 1);
+                    
+                    // 重置阴影设置
+                    ctx.shadowColor = 'transparent';
+                    ctx.shadowBlur = 0;
+                    ctx.shadowOffsetX = 0;
+                    ctx.shadowOffsetY = 0;
+                    
+                    ctx.restore();
+                });
+            }
+            
+            // 更新循环
+            function update() {
+                requestAnimationFrame(update);
+                
+                // 应用漩涡力
+                if (vortexActive && characterGroups.length > 0) {
+                    applyVortexForces();
+                    checkVortexCapture();
+                }
+                
+                // 更新引擎
+                Engine.update(engine);
+                
+                // 清除画布
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, canvas.width / (window.devicePixelRatio || 1), 600);
+                
+                // 绘制所有文字方块组
+                characterGroups.forEach(group => {
+                    drawCharacterBlocks(group);
+                });
+                
+                // 调试：绘制漩涡中心（可选，用于验证位置）
+                if (false) { // 设置为true可以调试显示漩涡中心
+                    ctx.fillStyle = 'rgba(255, 0, 0, 0.5)';
+                    ctx.beginPath();
+                    ctx.arc(vortexCenter.x, vortexCenter.y, 5, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    ctx.strokeStyle = 'rgba(139, 92, 246, 0.3)';
+                    ctx.beginPath();
+                    ctx.arc(vortexCenter.x, vortexCenter.y, CONFIG.vortex.captureRadius, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+            }
+            
+            // 初始化
+            function init() {
+                // 设置Canvas渲染属性
+                ctx.imageSmoothingEnabled = true;
+                ctx.imageSmoothingQuality = 'high';
+                
+                bindEvents();
+                update();
+                textInput.focus();
+            }
+            
+            init();
+        };
     </script>
 </body>
 </html>
