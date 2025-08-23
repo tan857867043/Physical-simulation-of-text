@@ -231,12 +231,11 @@
         /* 状态消息 */
         .status-message {
             position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
+            top: 1rem;
+            right: 1rem;
             background-color: rgba(0, 0, 0, 0.8);
             color: white;
-            padding: 1rem 1.5rem;
+            padding: 0.75rem 1.25rem;
             border-radius: 0.5rem;
             font-size: 0.875rem;
             z-index: 1000;
@@ -330,7 +329,12 @@
                         <div class="switch-slider"></div>
                     </div>
                 </div>
-
+                <div class="switch-item">
+                    <span>陀螺仪</span>
+                    <div id="gyroSwitch" class="switch">
+                        <div class="switch-slider"></div>
+                    </div>
+                </div>
             </div>
         </div>
         
@@ -345,6 +349,7 @@
         let characterGroups = [];
         let vortexActive = true;
         let gravityActive = true;
+        let gyroActive = false;
         let recognition = null;
         let isListening = false;
         let dirty = true;
@@ -383,8 +388,9 @@
                 angleRange: 25,        // 角度范围
             },
             joint: {
-                stiffness: 0.1,        // 更自然的刚度，类似index.html
-                damping: 0.1           // 更轻的阻尼，增加弹性
+                stiffness: 0.5,        // 刚度
+                damping: 0.1,          // 阻尼
+                length: 0              // 连接长度设为0，完全紧贴
             },
             colors: [
                 { bg: 'rgba(59, 130, 246, 0.95)', text: '#1e293b', border: 'rgba(59, 130, 246, 1)', gradient: ['#3B82F6', '#1D4ED8'] },
@@ -767,6 +773,7 @@
             const clearBtn = document.getElementById('clearBtn');
             const gravitySwitch = document.getElementById('gravitySwitch');
             const vortexSwitch = document.getElementById('vortexSwitch');
+            const gyroSwitch = document.getElementById('gyroSwitch');
             
             // 添加文字 - 同时处理点击和触摸事件
             const handleAddText = () => {
@@ -872,6 +879,13 @@
                     density: CONFIG.block.density,
                     sleepThreshold: 15, // 添加休眠阈值，减少静止物体的计算
                     collisionFilter: {
+                        group: -1, // 防止方块之间不必要的碰撞
+                        category: 0x0001,
+                        mask: 0xFFFFFFFF
+                    },
+                    density: CONFIG.block.density,
+                    sleepThreshold: 15 ,// 添加休眠阈值，减少静止物体的计算
+                    collisionFilter: {
                         group: 0, // 使用0而不是-1，允许与鼠标约束交互
                         category: 0x0001, // 文字块碰撞类别
                         mask: 0xFFFFFFFF // 允许与所有物体碰撞，包括鼠标约束
@@ -924,13 +938,11 @@
                     bodyB: blocks[i + 1].body,
                     pointA: { x: CONFIG.block.size / 2, y: 0 },
                     pointB: { x: -CONFIG.block.size / 2, y: 0 },
-                    length: CONFIG.block.gap,
+                    length: CONFIG.joint.length,
                     stiffness: CONFIG.joint.stiffness,
                     damping: CONFIG.joint.damping,
                     render: {
-                        visible: true,
-                        lineWidth: 1,
-                        strokeStyle: 'rgba(255, 255, 255, 0.2)'
+                        visible: false // 不显示连接线
                     }
                 });
                 
