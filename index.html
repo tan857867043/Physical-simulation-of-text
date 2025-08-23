@@ -3,7 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>2D文字物理模拟</title>
+    <meta name="screen-orientation" content="landscape">
+    <meta name="x5-orientation" content="landscape">
+    <meta name="full-screen" content="yes">
+    <meta name="x5-fullscreen" content="true">
+    <title>物理系统 - 移动版</title>
     <script src="matter.min.js"></script>
     <!-- 腾讯云语音识别 - 直接使用API调用，不需要SDK -->
     <script>
@@ -331,6 +335,12 @@
                         <div class="switch-slider"></div>
                     </div>
                 </div>
+                <div class="switch-item">
+                    <span>陀螺仪</span>
+                    <div id="gyroscopeSwitch" class="switch">
+                        <div class="switch-slider"></div>
+                    </div>
+                </div>
             </div>
         </div>
         
@@ -346,6 +356,8 @@
         let gravityActive = true;
         let recognition = null;
         let isListening = false;
+        let gyroscopeActive = false;
+        let deviceOrientation = { alpha: 0, beta: 0, gamma: 0 };
         
         // 设备检测
         const isMobileDevice = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i.test(navigator.userAgent);
@@ -400,6 +412,7 @@
         
         // 初始化
         function init() {
+            handleScreenOrientation();
             setupCanvas();
             setupPhysics();
             setupEventListeners();
@@ -407,6 +420,179 @@
             startGameLoop();
             
             showStatus('系统已就绪');
+        }
+        
+        // 处理屏幕方向
+        function handleScreenOrientation() {
+            if (!isMobileDevice) return;
+            
+            // 监听屏幕方向变化
+            window.addEventListener('orientationchange', handleOrientationChange);
+            window.addEventListener('resize', handleOrientationChange);
+            
+            // 强制横屏
+            lockLandscape();
+            
+            // 初始化陀螺仪
+            initGyroscope();
+        }
+        
+        // 强制横屏模式
+        function lockLandscape() {
+            if (!isMobileDevice) return;
+            
+            try {
+                // 尝试使用屏幕方向API
+                if (screen.orientation && screen.orientation.lock) {
+                    screen.orientation.lock('landscape').catch(() => {
+                        console.log('屏幕方向锁定失败，使用CSS替代');
+                        forceLandscapeCSS();
+                    });
+                } else if (screen.lockOrientation) {
+                    screen.lockOrientation('landscape');
+                } else if (screen.webkitLockOrientation) {
+                    screen.webkitLockOrientation('landscape');
+                } else {
+                    forceLandscapeCSS();
+                }
+            } catch (e) {
+                console.log('屏幕方向API不可用，使用CSS替代');
+                forceLandscapeCSS();
+            }
+        }
+        
+        // CSS强制横屏
+        function forceLandscapeCSS() {
+            if (!isMobileDevice) return;
+            
+            const style = document.createElement('style');
+            style.id = 'landscape-force';
+            style.textContent = `
+                @media screen and (orientation: portrait) {
+                    body {
+                        transform: rotate(90deg);
+                        transform-origin: center center;
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        width: 100vh;
+                        height: 100vw;
+                        overflow: hidden;
+                    }
+                    
+                    .app-container {
+                        width: 100vh;
+                        height: 100vw;
+                        transform: rotate(0deg);
+                    }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+        
+        // 处理方向变化
+        function handleOrientationChange() {
+            setTimeout(() => {
+                setupCanvas();
+                setupPhysics();
+            }, 100);
+        }
+        
+        // 初始化陀螺仪
+        function initGyroscope() {
+            if (!isMobileDevice) return;
+            
+            // 检查设备是否支持陀螺仪
+            if (window.DeviceOrientationEvent) {
+                // iOS 13+ 需要用户授权
+                if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+                    DeviceOrientationEvent.requestPermission()
+                        .then(response => {
+                            if (response === 'granted') {
+                                enableGyroscope();
+                            } else {
+                                console.log('陀螺仪权限被拒绝');
+                            }
+                        })
+                        .catch(console.error);
+                } else {
+                    // Android 或其他支持设备
+                    enableGyroscope();
+                }
+            } else {
+                console.log('设备不支持陀螺仪');
+            }
+        }
+        
+        // 启用陀螺仪监听
+        function enableGyroscope() {
+            window.addEventListener('deviceorientation', handleDeviceOrientation);
+            gyroscopeActive = true;
+            showStatus('陀螺仪已启用');
+            console.log('陀螺仪监听已启动');
+        }
+        
+        // 处理设备方向数据
+        function handleDeviceOrientation(event) {
+            if (!gyroscopeActive || !event) return;
+            
+            // 获取陀螺仪数据
+            deviceOrientation.alpha = event.alpha || 0; // 水平旋转
+            deviceOrientation.beta = event.beta || 0;   // 前后倾斜 (-180 to 180)
+            deviceOrientation.gamma = event.gamma || 0; // 左右倾斜 (-90 to 90)
+            
+            // 根据倾斜角度调整重力方向
+            if (gravityActive) {
+                updateGravityFromOrientation();
+            }
+        }
+        
+        // 根据设备方向更新重力
+        function updateGravityFromOrientation() {
+            const { beta, gamma } = deviceOrientation;
+            
+            // 将倾斜角度转换为重力向量
+            // beta: 前后倾斜 -> 影响Y轴重力
+            // gamma: 左右倾斜 -> 影响X轴重力
+            const sensitivity = 0.02; // 灵敏度调节
+            const maxAngle = 45; // 最大有效倾斜角度
+            
+            const betaClamped = Math.max(-maxAngle, Math.min(maxAngle, beta));
+            const gammaClamped = Math.max(-maxAngle, Math.min(maxAngle, gamma));
+            
+            const gravityY = isMobileDevice ? CONFIG.physics.mobileGravity : CONFIG.physics.gravity;
+            
+            // 计算新的重力向量
+            world.gravity.x = -gammaClamped * sensitivity;
+            world.gravity.y = betaClamped * sensitivity + gravityY;
+            
+            // 限制重力大小，防止过度反应
+            const maxGravity = gravityY * 2;
+            world.gravity.x = Math.max(-maxGravity, Math.min(maxGravity, world.gravity.x));
+            world.gravity.y = Math.max(0.1, Math.min(maxGravity * 2, world.gravity.y));
+        }
+        
+        // 切换陀螺仪状态
+        function toggleGyroscope() {
+            if (!isMobileDevice) {
+                showStatus('仅支持移动设备');
+                return;
+            }
+            
+            gyroscopeActive = !gyroscopeActive;
+            
+            if (gyroscopeActive) {
+                initGyroscope();
+                showStatus('陀螺仪已开启');
+            } else {
+                window.removeEventListener('deviceorientation', handleDeviceOrientation);
+                
+                // 恢复默认重力
+                world.gravity.x = 0;
+                world.gravity.y = isMobileDevice ? CONFIG.physics.mobileGravity : CONFIG.physics.gravity;
+                
+                showStatus('陀螺仪已关闭');
+            }
         }
         
         // 设置画布
@@ -723,6 +909,10 @@
             // 开关控制
             gravitySwitch.addEventListener('click', toggleGravity);
             vortexSwitch.addEventListener('click', toggleVortex);
+            
+            // 陀螺仪开关
+            const gyroscopeSwitch = document.getElementById('gyroscopeSwitch');
+            gyroscopeSwitch.addEventListener('click', toggleGyroscope);
             
             // 防止触摸事件的默认行为
             document.addEventListener('touchmove', (e) => {
