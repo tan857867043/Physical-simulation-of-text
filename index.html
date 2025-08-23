@@ -7,7 +7,7 @@
     <meta name="x5-orientation" content="landscape">
     <meta name="full-screen" content="yes">
     <meta name="x5-fullscreen" content="true">
-    <title>2D文字物理系统 - 2</title>
+    <title>2D文字物理系统 - 3</title>
     <script src="matter.min.js"></script>
     <!-- 腾讯云语音识别 - 直接使用API调用，不需要SDK -->
     <script>
@@ -363,38 +363,42 @@
         const isMobileDevice = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i.test(navigator.userAgent);
         
         // 配置
+        // ===== 系统可调参数配置 =====
         const CONFIG = {
             physics: {
-                gravity: 1.0, // 基础重力
-                mobileGravity: 0.6, // 移动端重力
-                timeScale: 1,
-                fps: 60
+                gravity: 1.0,           // 重力大小
+                mobileGravity: 0.6,     // 移动端重力
+                timeScale: 1,           // 时间缩放
+                fps: 60                 // 帧率
             },
             vortex: {
-                strength: 0.006, // 增强漩涡效果
-                captureRadius: 60, // 增大影响范围
-                rotationForce: 0.0006, // 增强旋转力
-                xPosition: 0.75
+                strength: 0.006,        // 漩涡力度
+                captureRadius: 60,      // 捕获半径
+                rotationForce: 0.0006,  // 旋转力
+                xPosition: 0.75         // 水平位置(0-1)
             },
             block: {
-                size: 35,
-                gap: 4,
-                restitution: 0.6, // 优化弹性系数
-                friction: 0.1, // 优化摩擦力
-                frictionAir: 0.005, // 减少空气阻力
-                density: 0.015, // 优化密度
-                collisionDelay: 200, // 极短碰撞延迟，快速启用碰撞
-                scaleDuration: 400 // 缩短缩放动画时间
+                size: 35,               // 方块大小
+                gap: 4,                 // 方块间隙
+                restitution: 0.6,       // 弹性
+                friction: 0.1,          // 摩擦力
+                frictionAir: 0.005,     // 空气阻力
+                density: 0.015,         // 密度
+                collisionDelay: 200,   // 碰撞延迟
+                scaleDuration: 400      // 缩放动画时间
             },
             launcher: {
-                x: 100,
-                y: 150,
-                baseForce: 10, // 基础发射力度
-                forceVariation: 8, // 力度变化范围
-                angleRange: 25, // 发射角度范围
-                // 移动端适配参数
-                mobileForceScale: 0.6, // 移动端力度缩放
-                mobileMaxForce: 20 // 移动端最大力度
+                x: 100,                 // 发射器X位置
+                y: 150,                 // 发射器Y位置
+                baseForce: 10,          // 基础发射力
+                forceVariation: 8,      // 力度变化范围
+                angleRange: 25,        // 角度范围
+                mobileForceScale: 0.6,  // 移动端力度缩放
+                mobileMaxForce: 20      // 移动端最大力度
+            },
+            joint: {
+                stiffness: 0.08,        // 更自然的刚度，类似index.html
+                damping: 0.05           // 更轻的阻尼，增加弹性
             },
             colors: [
                 { bg: 'rgba(59, 130, 246, 0.95)', text: '#1e293b', border: 'rgba(59, 130, 246, 1)', gradient: ['#3B82F6', '#1D4ED8'] },
@@ -412,6 +416,7 @@
         
         // 初始化
         function init() {
+            optimizeViewport();
             handleScreenOrientation();
             showLandscapeHint();
             setupCanvas();
@@ -535,7 +540,7 @@
             const style = document.createElement('style');
             style.id = 'landscape-force';
             style.textContent = `
-                /* 横屏优化 - 修复显示问题 */
+                /* 横屏优化 - 修复手机横屏显示问题 */
                 @media screen and (orientation: portrait) {
                     html, body {
                         margin: 0;
@@ -547,16 +552,14 @@
                     }
                     
                     body {
-                        transform: rotate(90deg);
-                        transform-origin: left top;
                         position: fixed;
                         top: 0;
                         left: 0;
                         width: 100vh;
                         height: 100vw;
+                        transform: rotate(90deg) translateY(-100vh);
+                        transform-origin: left top;
                         background-color: var(--gray-50);
-                        transform: translateY(-100vh) rotate(90deg);
-                        transform-origin: left bottom;
                     }
                     
                     .app-container {
@@ -568,42 +571,45 @@
                         position: absolute;
                         top: 0;
                         left: 0;
+                        display: flex;
+                        flex-direction: column;
                     }
                     
                     .canvas-container {
                         margin: 0;
                         border-radius: 0;
                         box-shadow: none;
-                        height: calc(100vw - 80px); /* 减去控制区域高度 */
+                        flex: 1;
+                        min-height: 0; /* 修复flex布局问题 */
+                        width: 100%;
                     }
                     
                     .bottom-controls {
-                        position: absolute;
-                        bottom: 0;
-                        left: 0;
-                        right: 0;
+                        position: relative;
                         border-radius: 0;
                         height: 80px;
                         padding: 0.5rem;
+                        flex-shrink: 0;
                     }
                     
                     /* 适配不同屏幕尺寸 */
                     @media (max-height: 600px) {
-                        .canvas-container {
-                            height: calc(100vw - 70px);
-                        }
                         .bottom-controls {
                             height: 70px;
                         }
                     }
                     
                     @media (max-height: 480px) {
-                        .canvas-container {
-                            height: calc(100vw - 60px);
-                        }
                         .bottom-controls {
                             height: 60px;
                             padding: 0.25rem;
+                        }
+                    }
+                    
+                    /* 修复iPhone横屏显示 */
+                    @supports (-webkit-touch-callout: none) {
+                        body {
+                            transform: rotate(90deg) translateY(-100vh) translateX(0px);
                         }
                     }
                     
@@ -634,6 +640,7 @@
                         height: 100vh;
                         width: 100vw;
                         overflow: hidden;
+                        position: fixed;
                     }
                     
                     .app-container {
@@ -641,37 +648,36 @@
                         margin: 0;
                         height: 100vh;
                         width: 100vw;
+                        display: flex;
+                        flex-direction: column;
+                        position: absolute;
+                        top: 0;
+                        left: 0;
                     }
                     
                     .canvas-container {
                         border-radius: 0;
                         margin: 0;
-                        height: calc(100vh - 80px);
+                        flex: 1;
+                        min-height: 0; /* 修复flex布局问题 */
+                        width: 100%;
                     }
                     
                     .bottom-controls {
-                        position: absolute;
-                        bottom: 0;
-                        left: 0;
-                        right: 0;
+                        position: relative;
                         border-radius: 0;
                         height: 80px;
+                        flex-shrink: 0;
                     }
                     
                     /* 适配不同屏幕尺寸 */
                     @media (max-height: 600px) {
-                        .canvas-container {
-                            height: calc(100vh - 70px);
-                        }
                         .bottom-controls {
                             height: 70px;
                         }
                     }
                     
                     @media (max-height: 480px) {
-                        .canvas-container {
-                            height: calc(100vh - 60px);
-                        }
                         .bottom-controls {
                             height: 60px;
                             padding: 0.25rem;
@@ -680,16 +686,8 @@
                 }
                 
                 /* 全屏模式优化 */
-                :-webkit-full-screen .app-container {
-                    border-radius: 0;
-                    margin: 0;
-                }
-                
-                :-moz-full-screen .app-container {
-                    border-radius: 0;
-                    margin: 0;
-                }
-                
+                :-webkit-full-screen .app-container,
+                :-moz-full-screen .app-container,
                 :fullscreen .app-container {
                     border-radius: 0;
                     margin: 0;
@@ -703,7 +701,17 @@
             setTimeout(() => {
                 setupCanvas();
                 setupPhysics();
+                // 强制重新计算布局
+                window.dispatchEvent(new Event('resize'));
             }, 100);
+        }
+        
+        // 优化viewport设置
+        function optimizeViewport() {
+            const viewport = document.querySelector('meta[name="viewport"]');
+            if (viewport) {
+                viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover');
+            }
         }
         
         // 初始化陀螺仪
@@ -713,31 +721,24 @@
                 return;
             }
             
-            const gyroscopeSwitch = document.getElementById('gyroscopeSwitch');
-            const gyroscopeText = gyroscopeSwitch.querySelector('.switch-text');
-            
             // 检查设备是否支持陀螺仪
             if (window.DeviceOrientationEvent) {
                 // iOS 13+ 需要用户授权
                 if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-                    gyroscopeText.textContent = '陀螺仪(请求权限)';
                     showStatus('正在请求陀螺仪权限...');
                     
                     DeviceOrientationEvent.requestPermission()
                         .then(response => {
                             if (response === 'granted') {
-                                gyroscopeText.textContent = '陀螺仪';
                                 enableGyroscope();
                                 showGyroscopeFeedback('陀螺仪已启用');
                             } else {
-                                gyroscopeText.textContent = '陀螺仪(权限拒绝)';
                                 showStatus('陀螺仪权限被拒绝');
                                 showGyroscopeFeedback('权限被拒绝');
                             }
                         })
                         .catch(error => {
                             console.error('陀螺仪权限请求失败:', error);
-                            gyroscopeText.textContent = '陀螺仪(错误)';
                             showStatus('陀螺仪初始化失败');
                             showGyroscopeFeedback('初始化失败');
                         });
@@ -1314,16 +1315,21 @@
                 World.add(world, block);
             });
             
-            // 创建连接
+            // 创建文字方块连接（学习index.html的方式）
             for (let i = 0; i < blocks.length - 1; i++) {
                 const joint = Matter.Constraint.create({
                     bodyA: blocks[i].body,
                     bodyB: blocks[i + 1].body,
-                    pointA: { x: CONFIG.block.size / 2 + CONFIG.block.gap / 2, y: 0 },
-                    pointB: { x: -CONFIG.block.size / 2 - CONFIG.block.gap / 2, y: 0 },
-                    length: 0,
-                    stiffness: 0.1,
-                    damping: 0.1
+                    pointA: { x: CONFIG.block.size / 2, y: 0 },
+                    pointB: { x: -CONFIG.block.size / 2, y: 0 },
+                    length: CONFIG.block.gap,
+                    stiffness: CONFIG.joint.stiffness,
+                    damping: CONFIG.joint.damping,
+                    render: {
+                        visible: true,
+                        lineWidth: 1,
+                        strokeStyle: 'rgba(255, 255, 255, 0.2)'
+                    }
                 });
                 
                 joints.push(joint);
@@ -1331,7 +1337,7 @@
             }
             
             // 发射 - 移动端力度适配
-            const angle = (Math.random() - 0.5) * CONFIG.launcher.angleRange * Math.PI / 180;
+            const angle = (Math.random() - 0.8) * CONFIG.launcher.angleRange * Math.PI / 180;
             
             // 移动端使用缩放后的力度
             let baseForce = CONFIG.launcher.baseForce;
@@ -1567,7 +1573,7 @@
             
             showStatus(gravityActive ? '重力已开启' : '重力已关闭');
         }
-        
+
         function toggleVortex() {
             vortexActive = !vortexActive;
             
