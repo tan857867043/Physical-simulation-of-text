@@ -698,13 +698,6 @@
                 e.preventDefault();
             }, { passive: false });
             
-            const touchControl = {
-                element: canvas,
-                target: null,
-                startX: 0,
-                startY: 0
-            };
-            
             // 鼠标控制 - 优化鼠标拖动，支持触摸
             mouseConstraint = MouseConstraint.create(engine, {
                 mouse: mouse,
@@ -913,63 +906,59 @@
             const joints = [];
             
             characters.forEach((char, index) => {
-                const x = startX - totalWidth / 2 + index * (CONFIG.block.size + CONFIG.block.gap) + CONFIG.block.size / 2;
-                const block = Bodies.rectangle(x, startY, CONFIG.block.size * initialScale, CONFIG.block.size * initialScale, {
+                // 计算字体大小
+                const fontSize = calculateFontSize(char);
+                // 测量字符实际宽高
+                const measureCanvas = document.createElement('canvas');
+                const measureCtx = measureCanvas.getContext('2d');
+                measureCtx.font = `bold ${fontSize}px system-ui`;
+                const metrics = measureCtx.measureText(char);
+                // 取宽度和高度（高度用 actualBoundingBoxAscent + actualBoundingBoxDescent）
+                const charWidth = metrics.width;
+                const charHeight = (metrics.actualBoundingBoxAscent || fontSize * 0.8) + (metrics.actualBoundingBoxDescent || fontSize * 0.2);
+                // 计算位置，间距用字符宽度
+                const x = startX - totalWidth / 2 + index * (charWidth + CONFIG.block.gap) + charWidth / 2;
+                // 创建物理方块，宽高与字符视觉一致
+                const block = Bodies.rectangle(x, startY, charWidth * initialScale, charHeight * initialScale, {
                     restitution: CONFIG.block.restitution,
                     friction: CONFIG.block.friction,
                     frictionAir: CONFIG.block.frictionAir,
                     density: CONFIG.block.density,
-                    sleepThreshold: 15, // 添加休眠阈值，减少静止物体的计算
+                    sleepThreshold: 15,
                     collisionFilter: {
-                        group: -1, // 防止方块之间不必要的碰撞
+                        group: 0,
                         category: 0x0001,
                         mask: 0xFFFFFFFF
                     },
-                    density: CONFIG.block.density,
-                    sleepThreshold: 15 ,// 添加休眠阈值，减少静止物体的计算
-                    collisionFilter: {
-                        group: 0, // 使用0而不是-1，允许与鼠标约束交互
-                        category: 0x0001, // 文字块碰撞类别
-                        mask: 0xFFFFFFFF // 允许与所有物体碰撞，包括鼠标约束
-                    },
-                    // 添加自定义属性，标记为可拖拽
                     plugin: {
                         attractors: [],
                         draggable: true
                     }
                 });
-                
-                // 延迟后启用碰撞
-                // 不再需要延迟修改碰撞过滤器，因为我们已经设置了正确的值
-                // 但保留延迟以确保文字块有时间正确定位
                 setTimeout(() => {
-                    // 确保文字块已经准备好进行交互
                     Matter.Sleeping.set(block, false);
                 }, CONFIG.block.collisionDelay);
-                
-                // 添加缩放动画
+                // 缩放动画
                 let currentScale = initialScale;
                 const startTime = Date.now();
                 const scaleAnimation = () => {
                     const elapsed = Date.now() - startTime;
                     const progress = Math.min(elapsed / CONFIG.block.scaleDuration, 1);
                     currentScale = initialScale + (1 - initialScale) * progress;
-                    
                     Body.scale(block, currentScale / (currentScale - scaleStep), currentScale / (currentScale - scaleStep));
-                    
                     if (progress < 1) {
                         requestAnimationFrame(scaleAnimation);
                     }
                 };
                 scaleAnimation();
-                
                 blocks.push({
                     body: block,
                     char: char,
                     color: color,
-                    fontSize: calculateFontSize(char)
+                    fontSize,
+                    charWidth,
+                    charHeight
                 });
-                
                 World.add(world, block);
             });
             
@@ -1339,50 +1328,8 @@
             let networkTipEl = document.getElementById('networkErrorTip');
             
             if (!networkTipEl) {
-                networkTipEl = document.createElement('div');
-                networkTipEl.id = 'networkErrorTip';
-                networkTipEl.style.position = 'fixed';
-                networkTipEl.style.bottom = '20px';
-                networkTipEl.style.left = '50%';
-                networkTipEl.style.transform = 'translateX(-50%)';
-                networkTipEl.style.backgroundColor = 'rgba(239, 68, 68, 0.9)';
-                networkTipEl.style.color = 'white';
-                networkTipEl.style.padding = '10px 20px';
-                networkTipEl.style.borderRadius = '5px';
-                networkTipEl.style.boxShadow = '0 2px 10px rgba(0,0,0,0.2)';
-                networkTipEl.style.zIndex = '1000';
-                networkTipEl.style.textAlign = 'center';
-                networkTipEl.style.maxWidth = '80%';
-                networkTipEl.style.fontSize = '14px';
-                document.body.appendChild(networkTipEl);
-            }
-            
-            networkTipEl.innerHTML = `
-                <div style="margin-bottom:8px"><strong>网络连接问题</strong></div>
-                <div>请检查您的网络连接并尝试以下解决方法:</div>
-                <ul style="text-align:left; margin:8px 0; padding-left:20px">
-                    <li>确保设备已连接到互联网</li>
-                    <li>尝试使用更稳定的网络连接</li>
-                    <li>关闭并重新打开浏览器</li>
-                    <li>允许浏览器访问麦克风权限</li>
-                </ul>
-                <button id="closeNetworkTip" style="background:#fff; color:#e53e3e; border:none; padding:5px 10px; border-radius:3px; cursor:pointer; margin-top:5px">关闭提示</button>
-            `;
-            
-            // 显示提示
-            networkTipEl.style.display = 'block';
-            
-            // 添加关闭按钮事件
-            document.getElementById('closeNetworkTip').addEventListener('click', () => {
-                networkTipEl.style.display = 'none';
-            });
-            
-            // 5秒后自动隐藏
-            setTimeout(() => {
-                if (networkTipEl) {
-                    networkTipEl.style.display = 'none';
-                }
-            }, 5000);
+            // ...existing code...
+        }
         }
         
         // 颜色处理工具函数
